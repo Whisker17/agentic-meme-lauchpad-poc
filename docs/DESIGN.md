@@ -1,9 +1,10 @@
 # mantle-agentic-meme-launchpad — Design (spec of record)
 
-> **Status:** v0.3 (2026-10-20), from the owner design interview (Appendix A), amended by an
+> **Status:** v0.4 (2026-10-20), from the owner design interview (Appendix A), amended by an
 > independent design review (Appendix B, findings R-1…R-8).
 > v0.3: the facts measured and the decisions taken in 0.1.0 are recorded in place, each marked
 > "(measured 0.1.0)" or "(decision 2026-10-20)".
+> v0.4: likewise for 0.1.1 (command mode), marked "(measured 0.1.1)" or "(decision 2026-10-20)".
 
 > **Nature:** proof of concept on Mantle Sepolia. **The contracts are not audited.**
 > **Upstream:** `mantle-7702-sdk` v0.1.4 (`@0xwh1sker/mantle-aa-{sdk,sponsor,cli}`), whose
@@ -174,15 +175,21 @@ Per token, constant product over virtual reserves:
 | `k` | `VIRTUAL_TOKEN_0 × VIRTUAL_QUOTE_0` |
 | `FEE_BPS` | 100 (1%), creator share 50% |
 
-- State per token: `vT` (virtual token reserve), `vQ` (virtual quote reserve), `sold`
-  (`CURVE_SUPPLY` − tokens still on the curve), `realQuote` (`vQ − VIRTUAL_QUOTE_0`), `status`.
+- State per token: `vT` (virtual token reserve), `vQ` (virtual quote reserve), `status` (plus
+  `creator`, `createdAt`). (decision 2026-10-20) `sold` (`CURVE_SUPPLY` − tokens still on the
+  curve, = `VIRTUAL_TOKEN_0 − vT`) and `realQuote` (`vQ − VIRTUAL_QUOTE_0`) are not stored:
+  `curveState` computes them (`contracts/src/MemeLaunchpad.sol`).
 - **Canonical price** `priceE18 = vQ · 1e36 / vT`: quote base units (6 decimals) per 10¹⁸ token
   base units (one whole token), scaled by 10¹⁸ — ≈ 1.875 × 10¹⁷ at launch, ×16 at completion.
   (Changed 2026-10-20 from `vQ · 1e18 / vT`, which truncates to 0 at launch with these
   parameters.) All arithmetic is in base units; human units are display only.
 - Spot price ≈ 1.875 × 10⁻⁷ mUSD per token at start (FDV ≈ 187.5 mUSD); at completion
   `vT ≈ 266,666,667`, `vQ ≈ 800` mUSD, price ×16 (FDV ≈ 3,000 mUSD). Filling the curve takes
-  ≈600 mUSD net of fees.
+  ≈600 mUSD net of fees. (measured 0.1.1) That is ≈606.06 mUSD gross of the 1% buy fee: `vQ`
+  ends at exactly `ceil(k / (VIRTUAL_TOKEN_0 − CURVE_SUPPLY))` = 800 mUSD, so the curve books
+  600 mUSD net. On the fork, after 600 mUSD gross (594 net) `vQ` = 794 mUSD and `vT` ≈ 268.68 M
+  tokens; the completing buy took the remaining 2,015,113.1 tokens for exactly 6.060607 mUSD
+  (fee 0.060607), 606.060607 mUSD gross in total (`e2e/command/command.fork.test.ts`, PR #15).
 - All parameters are immutable constructor arguments (one launchpad = one parameter set).
 - Rounding always favours the curve: `k / x` rounds up when computing the new reserve the trader
   is owed against.
@@ -250,7 +257,9 @@ Errors (measured 0.1.0, `contracts/src/MemeLaunchpad.sol`): `UnknownToken` (not 
 event keeps the name `CurveCompleted`, because solc rejects an error and an event sharing one
 identifier), `InsufficientOutput` (`out < minOut`), `ZeroOutput`, `ZeroAmount`, `Expired`,
 `NotCreator`, `InvalidParams` (constructor). The CLI maps the first three to exit 42 / 40 / 41
-(§6.3).
+(§6.3). (measured 0.1.1) The CLI sees these errors directly only from a view (`quoteBuy`,
+`quoteSell`). On a send, Calibur drops the launchpad's revert data (§5 Errors), so the SDK works
+out the meme error from chain state.
 
 #### 4.3.1 createToken
 
@@ -378,6 +387,11 @@ iteration means a new launchpad version; tokens completed on v1 are not migrated
   to `amountInUsed`; budget checks and displayed cost use the clamped amount.
 - **Symbol resolution**: exact, case-insensitive match over the registry (bounded scan of
   `tokens(offset, limit)`); a miss or an ambiguity is exit 42 with at most 10 candidates.
+  (measured 0.1.1) The bound is the newest 1000 registered tokens (`DEFAULT_MAX_SCAN`,
+  `scanTokens`), shared by symbol resolution, the portfolio scan and `claim --all` (and `list`
+  pages within the same 1000). An address is checked with `isRegistered`. The candidates are the
+  ambiguous matches, or for a miss the symbols that contain the query
+  (`packages/sdk/src/discovery.ts`).
 - **Discovery**: `listTokens({offset, limit})`, `curveState`, and `watch({fromBlock})`: an
   `eth_getLogs` poller (2 s) over `TokenCreated` / `Trade` / `CurveCompleted`, deduplicated by
   `(txHash, logIndex)`, tolerant of a load-balanced RPC answering a block behind
@@ -393,12 +407,30 @@ iteration means a new launchpad version; tokens completed on v1 are not migrated
   summary and the key's expiry (Calibur key settings). No history, realised-PnL ledger or charts.
   Inventory without journal entries has cost basis and PnL `null` ("unknown"). Supported scope:
   one active agent session per account.
+  (measured 0.1.1) The hook views take the key hash first: `inventory(keyHash, account, token)`,
+  `remainingLimit(keyHash, account, token)`, `getSummary(keyHash, account)`. The expiry is bits
+  160–199 of Calibur `getKeySettings(keyHash)` on the account. Tokens checked: the newest 1000
+  registered (see Symbol resolution) plus every token in the journal
+  (`packages/sdk/src/portfolio.ts`).
 - **Executor**: wraps `AgentSession.simulate` + `exec` (relayer). Before sending it takes a
   **cross-process file lock** `<agentHome>/meme/send.lock`, and retries `SPONSOR_BUSY` with
   backoff (max 60 s). One process at a time per account, so the autopilot and a TG command never
-  race the sponsor.
+  race the sponsor. (measured 0.1.1) `execute` takes the lock, calls
+  `AgentSession.exec` (simulate, then submit), reads the receipt and journals the transaction's
+  own `Trade` logs. A failed send is explained from chain state, not from revert data (Errors
+  below).
 - **Errors**: AA SDK errors pass through; meme errors `CurveCompletedError`, `SlippageError`,
   `UnknownTokenError`, `InsufficientBalanceError`, `AutopilotStateError`.
+  (measured 0.1.1) The deployed Calibur reverts a failing session call with a bare `CallFailed()`
+  (`0x3204506f`), and the launchpad's revert data is lost. A batch that reverts on chain carries
+  no data at all. So `execute` does not decode a failed send. It diagnoses it from chain state
+  (`diagnoseFailure`): for each launchpad `buy` / `sell` in the batch it checks the quote view's
+  revert (`UnknownTokenError`, `CurveCompletedError`), then the account's balance
+  (`InsufficientBalanceError`), then the current quote against `minOut` (`SlippageError`).
+  This is a heuristic: a slippage failure is diagnosed by re-quoting the current state. Anything
+  it cannot explain passes through unchanged as the AA error (exit 30 for a revert).
+  `toMemeError` still decodes the launchpad errors from a view's revert data
+  (`packages/sdk/src/{errors,executor}.ts`).
 - **Strategy engine** (pure, unit-tested): `(strategy, events, positions, now) → actions`.
 
 ## 6. CLI (`mantle-meme`)
@@ -427,6 +459,19 @@ mantle-meme autopilot     start --strategy <file> | stop | status | log [--since
 error). Amounts are human units (mUSD, tokens); `--json` output carries both human and base
 units and the transaction hash plus explorer link.
 
+(measured 0.1.1) Shipped differences from the above; `packages/cli/README.md` is the detailed
+reference for every `--json` result:
+
+- A missing or ambiguous symbol is exit 42 `UNKNOWN_TOKEN` with `candidates` (§5, §6.3), not a
+  usage error. Symbols resolve over the newest 1000 tokens.
+- `create` also takes `[--slippage 5]` for the dev buy. `list --limit` is 1–100, newest first.
+- Every amount in a result is `{human, base}` (base units as a decimal string). Every
+  transaction is `hash` plus `explorer` (a Mantlescan link). `claim` with nothing due returns
+  `hash` and `explorer` as `null`. `watch` prints one JSON line per event:
+  `{event, blockNumber, transactionHash, logIndex, args}`.
+- `policy init --expiry` accepts only `24h` (§6.2).
+- `autopilot *` is not shipped in 0.1.1 (0.1.2).
+
 ### 6.2 policy init
 
 Generates the policy for `mantle-aa session grant`: quote limit on MockUSD (total, per-day,
@@ -442,6 +487,12 @@ Generates the policy for `mantle-aa session grant`: quote limit on MockUSD (tota
 
 It also prints the exact `mantle-aa` commands the human runs next (§8.1).
 
+(decision 2026-10-20) `--expiry` accepts only `24h` (any other value is a usage error). `mantle-aa`
+0.1.5 grants session keys for 24 hours (the SDK default). `session grant` / `account init --grant`
+take no expiry option, and the policy file rejects unknown keys, so it cannot carry an expiry
+field. The AA SDK's `grant` accepts an `expiry`, but its CLI does not expose it. That was filed
+upstream as non-blocking feedback (§11.1). `--json` reports `expirySeconds` (86400).
+
 ### 6.3 Output and exit codes
 
 Every command supports `--json` (`{ok, command, result}` / `{ok:false, command, exitCode,
@@ -456,6 +507,20 @@ Meme codes:
 | 43 | `INSUFFICIENT_BALANCE` | The account's MockUSD (or token) balance is too low (11 is the policy limit) |
 | 44 | `AUTOPILOT_STATE` | Already running / not running |
 
+(measured 0.1.1) As shipped (`packages/cli/src/errors.ts`, `packages/cli/README.md`):
+
+- The CLI depends on `@0xwh1sker/mantle-aa-cli` (`~0.1.5`) at **runtime** and classifies every
+  non-meme error with its `describeError` / `EXIT_CODES`, so AA exit codes and `error.code`s
+  pass through unchanged (exit 1 is `USAGE` or any other error, `ERROR`).
+- The `--json` error is `{code, type, message, …fields}`, carrying the error's own fields, e.g.
+  `remaining` (11), `held` (12), `candidates` (42), `balance` / `needed` (43). Exit 40 always
+  carries the §4.5 text.
+- On a send, 40 / 41 / 43 come from the meme error that the SDK's `execute` diagnoses from chain
+  state, never from Calibur's revert data (§5 Errors). An undiagnosable revert is exit 30
+  `EXECUTION_REVERTED`. Before trading, `buy`, `sell` and `quote` check the curve (40) and resolve
+  the token (42).
+- 44 is reserved until the autopilot ships (0.1.2).
+
 ## 7. Key flows
 
 ### 7.1 Command trade (buy)
@@ -464,6 +529,9 @@ Meme codes:
 launchpad, amount), buy(token, amount, minOut, now+300, account)]` → lock →
 `AgentSession.simulate` → `exec` (relayer) → receipt → journal → result with tx link. Sell is a
 single `sell` call, `amount ≤` this session's inventory (checked locally, exit 12 otherwise).
+(measured 0.1.1) A failure in `simulate` or on chain surfaces as Calibur's bare `CallFailed()`.
+The SDK maps it to 40 / 41 / 43 from chain state, otherwise it is exit 30 (§5 Errors, §6.3).
+Exit 41 was measured on the fork through a price move between the quote and the send.
 
 ### 7.2 Create with dev buy
 
@@ -562,6 +630,15 @@ mantle-aa account exec --calls '<MockUSD mint to the account>'
 
 OpenClaw's environment sets `MANTLE_AA_HOME=~/.mantle-meme-agent` and its own password.
 
+(decision 2026-10-20) `--expiry 24h` is the only accepted value: the `mantle-aa` 0.1.5 grant
+always expires the session key 24 hours after the grant (§6.2). (measured 0.1.1) This setup
+runs on the fork with the published `mantle-aa` 0.1.5 (§9.1 item 1). `policy init` prints the
+next commands:
+`account init --grant`, `session export`, and the MockUSD mint as an `account exec --calls` line
+whose calldata is exact when the root home holds one root profile. It prints `keys new` first when
+the home holds no root profile. On an account that is already initialised, the human runs
+`mantle-aa session grant --agent trader --policy policy.json` instead.
+
 ### 8.2 Skill (`skills/mantle-meme/SKILL.md`)
 
 Frontmatter requires the `mantle-meme` binary. Body:
@@ -609,6 +686,9 @@ once on Mantle Sepolia producing `docs/acceptance.md` with every transaction lin
 3. market-sim creates a token → autopilot buys within `maxAgeSeconds`; `pump` → take-profit sell;
    max-hold sell; `budget_exhausted` when the limit runs out.
 4. A market-sim buy fills the curve through truncation → `Completed`; buy/sell then exit 40.
+   (measured 0.1.1) In the 0.1.1 gate, the CLI's own clamped completing buy (`amountIn =
+   amountInUsed`, the contract's completing branch) completed the curve, because market-sim lands
+   in 0.1.2. The on-chain race truncation is covered by `e2e/launchpad/session.fork.test.ts`.
 5. `claim` pays the creator share; `claimProtocolFees` pays the treasury.
 6. Refusals: MockUSD `transfer` (10), over-limit buy (11), selling more than bought (12), unknown
    token (42), slippage (41), autopilot double start (44).
@@ -644,8 +724,10 @@ once on Mantle Sepolia producing `docs/acceptance.md` with every transaction lin
   - **C5 lifecycle** — no trade after `Completed`; `Graduated` unreachable;
   - **C6 truncation** — the completing buy pulls `amountInUsed ≤ amountIn`, delivers exactly
     the remainder, books only `netUsed` / `feeUsed`, and `quoteBuy` returns the same values.
-- **Dust:** one quote base unit; fees of 1, 2 and 3 units (split); final-buy dust overpayment;
-  `quoteBuy` / `quoteSell` at zero output; `ZeroOutput` reverts.
+- **Dust:** one quote base unit; fees of 1, 2 and 3 units (split); `quoteBuy` / `quoteSell` at
+  zero output; `ZeroOutput` reverts. (decision 2026-10-20) "Final-buy dust overpayment" is
+  dropped from this list: the completing buy books exactly `netUsed == netNeeded` (§4.3.3), so it
+  cannot overpay.
 - **§4.4 clause 7 anti-theft:** a third party calling `sell` cannot reduce a victim's balance;
   direct `launchpadTransfer` is refused; no entry pulls a victim's assets; `claimCreatorFees` by
   a non-creator reverts; CREATE2 address cannot be squatted by another creator (salt binds
@@ -673,7 +755,7 @@ once on Mantle Sepolia producing `docs/acceptance.md` with every transaction lin
 |---|---|---|
 | AA SDK **0.1.5** (in `mantle-7702-sdk`, its own release process) | `mantle-aa session export` (+ tests, docs, npm publish) | Before meme 0.1.1 |
 | **0.1.0** — contracts | Repo scaffold + CI; MemeLaunchpad / MemeToken + full Foundry suite (unit, fuzz, invariants C1–C6, dust, anti-theft); meme-sdk builders, CREATE2 prediction, quotes; fork integration with the real AA contracts incl. the create + dev-buy spike on the full sponsor path; contract review checkpoint; Sepolia deployment + address book | CI green; review checkpoint PASS; Sepolia deployed |
-| **0.1.1** — command mode | meme-sdk discovery, symbol resolution, send lock, journal, portfolio; `mantle-meme` all non-autopilot commands + exit codes; `policy init`; consumes AA 0.1.5 (exported agent home) | Fork e2e of §9.1 items 1, 2, 5, 6 (minus 44) |
+| **0.1.1** — command mode | meme-sdk discovery, symbol resolution, send lock, journal, portfolio; `mantle-meme` all non-autopilot commands + exit codes; `policy init`; consumes AA 0.1.5 (exported agent home) | Fork e2e of §9.1 items 1, 2, 5, 6 (minus 44). (measured 0.1.1) **Passed**: items 1, 2 (incl. the clamp case), 4, 5 and 6 (10, 11, 12, 41, 42; minus 44) green on the fork through the real `mantle-meme` and `mantle-aa` binaries, `e2e/command/command.fork.test.ts` 17 passed / 0 skipped (PR #15). Exit 10 is the AA SDK's local refusal there (on-chain refusal: `e2e/launchpad/session.fork.test.ts`) |
 | **0.1.2** — autopilot | Strategy engine + daemon, Telegram push, `autopilot *`; market-sim; full anvil e2e §9.1 in CI; Sepolia acceptance run → `docs/acceptance.md` | §9.1 green on fork and Sepolia |
 | **0.1.3** — agent + demo | `SKILL.md`; `demo-up/down.sh`; docs (usage, demo script); TG demo §9.2 recorded | **Definition of Done** |
 | **0.1.4** — review + publish | Final independent security review (and fixes); npm publish `@0xwh1sker/mantle-meme-{sdk,cli}` | Review PASS; packages on npm. Does not block 0.1.3 |
@@ -688,12 +770,17 @@ review gates, release branches).
 - **Channel:** Linear, in the `mantle-7702-sdk` project and its own release process. This
   repository never patches, vendors or forks AA SDK code (no `node_modules` patches, no copied
   sources); it consumes published versions only, pinned `~0.1.5` once 0.1.5 ships.
+  (measured 0.1.1) 0.1.5 shipped. `@0xwh1sker/mantle-aa-{sdk,sponsor,cli}` are pinned `~0.1.5`
+  (PRs #13, #14). `mantle-aa-cli` is a runtime dependency of `mantle-meme`, used for error
+  classification (§6.3), and the fork tests use its `mantle-aa` binary.
 - **Blocking needs** become an issue in an SDK release, written self-contained (spec +
   acceptance criteria, not only a link here), with a cross-project *blocks* relation to the
   meme issue that needs it. First instance: SDK Release 0.1.5, `mantle-aa session export`
   (§8.1, WHI-2036) blocks meme 0.1.1 (WHI-2047).
 - **Non-blocking feedback** goes to the SDK project's Backlog with the label
-  `from:meme-launchpad`, outside any release until the SDK owner schedules it (first: WHI-2038, WHI-2039).
+  `from:meme-launchpad`, outside any release until the SDK owner schedules it (first: WHI-2038, WHI-2039;
+  (decision 2026-10-20) then WHI-2070, a session expiry option for `session grant` /
+  `account init --grant`, §6.2).
 - **Not** `docs/DEFERRED_ISSUES.md` of the SDK: that file records debt deferred by the SDK's
   own reviews.
 - **During implementation**, a meme implementer who finds a new SDK need records it on its meme
