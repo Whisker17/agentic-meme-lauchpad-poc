@@ -132,8 +132,15 @@ describe("builders", () => {
 describe("loadDeployments", () => {
   const aa = loadAaDeployments();
 
-  it("merges the shipped book with the AA SDK's; launchpad null until deployed", () => {
-    expect(loadDeployments()).toEqual({ ...aa, memeLaunchpad: null });
+  const deployed = "0xB7E6E09Bc2dF2b078A9171abA68663f13E2bc985";
+
+  it("merges the shipped book with the AA SDK's", () => {
+    expect(loadDeployments()).toEqual({ ...aa, memeLaunchpad: deployed });
+  });
+
+  it("an empty address means not deployed yet", () => {
+    const book = loadDeployments({ meme: { chainId: aa.chainId, MemeLaunchpad: { address: "" } } });
+    expect(book).toEqual({ ...aa, memeLaunchpad: null });
   });
 
   it("checksums a deployed launchpad address", () => {
@@ -154,7 +161,7 @@ describe("loadDeployments", () => {
 
   it("reads a record from a path", () => {
     const file = new URL("../../../deployments/mantle-sepolia.json", import.meta.url);
-    expect(loadDeployments({ meme: file }).memeLaunchpad).toBeNull();
+    expect(loadDeployments({ meme: file }).memeLaunchpad).toBe(deployed);
   });
 });
 
