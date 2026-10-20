@@ -336,12 +336,16 @@ export class Acceptance {
   async start() {
     this.simRpc = await new RpcProxy(this.cfg.rpcUrl).listen();
     this.sponsorRpc = await new RpcProxy(this.cfg.rpcUrl).listen();
+    for (const p of [this.simRpc, this.sponsorRpc]) {
+      p.onSent = (hash) => this.sentIn.set(hash, this.item);
+    }
+    // Evidence for a failure a client reports without its cause (an eth_call that reverts is one
+    // too: the agent's CLI diagnoses refusals that way).
     for (const [name, p] of [
       ["market-sim", this.simRpc],
       ["sponsor", this.sponsorRpc],
+      ["agent", this.agentRpc],
     ] as const) {
-      p.onSent = (hash) => this.sentIn.set(hash, this.item);
-      // Evidence for a failure the sponsor or market-sim reports without its cause.
       p.onError = (methods, detail) =>
         this.log(`${name} rpc: ${methods.join(",")} → ${this.scrub(detail)}`);
     }
@@ -636,12 +640,45 @@ export class Acceptance {
     return r;
   }
 
+  /**
+   * Runs a CLI command again (twice at most, logged) when it failed for a reason outside the
+   * product that left nothing sent: a read-only command (`quote`, `info`, `list`, `portfolio`,
+   * `autopilot status`) on an RPC failure, or any command the sponsor refused with
+   * `FEE_UNBOUNDED` (its gas price oracle read failed; nothing was submitted).
+   */
+  private async retried(what: string, run: () => Promise<Ran>): Promise<Ran> {
+    for (let attempt = 1; ; attempt++) {
+      const r = this.keep(await run());
+      const e = r.json?.error;
+      const readOnly = /^(quote|info|list|portfolio|autopilot status)$/.test(r.json?.command ?? "");
+      const why =
+        r.code === 20 && e?.reason === "FEE_UNBOUNDED"
+          ? e.message
+          : r.code === 1 &&
+              readOnly &&
+              /RPC Request failed|HTTP request failed|took too long|fetch failed/i.test(
+                e?.message ?? "",
+              )
+            ? e.message
+            : undefined;
+      if (!why || attempt === 3) return r;
+      this.log(
+        `retrying ${what} (attempt ${attempt} failed outside the product: ${this.scrub(why)})`,
+      );
+      await sleep(3_000);
+    }
+  }
+
   private meme(...args: string[]) {
-    return mantleMeme([...args, "--json"], this.agentEnv).then((r) => this.keep(r));
+    return this.retried(`mantle-meme ${args[0]}`, () =>
+      mantleMeme([...args, "--json"], this.agentEnv),
+    );
   }
 
   private aa(args: string[], env = this.rootEnv, input?: string) {
-    return mantleAa([...args, "--json"], env, input).then((r) => this.keep(r));
+    return this.retried(`mantle-aa ${args[0]} ${args[1]}`, () =>
+      mantleAa([...args, "--json"], env, input),
+    );
   }
 
   private ok(r: Ran, command: string) {
@@ -965,7 +1002,13 @@ export class Acceptance {
       moved = r.transactionHash;
     };
     try {
-      const r = await this.meme("buy", symbol, "--amount", "1", "--slippage", "1");
+      // Not retried: the race is armed once.
+      const r = this.keep(
+        await mantleMeme(
+          ["buy", symbol, "--amount", "1", "--slippage", "1", "--json"],
+          this.agentEnv,
+        ),
+      );
       assert.equal(fired, 1, "the race buy ran between the quote and the send");
       assert.ok(moved);
       this.fails(r, "buy", 41, "SLIPPAGE");
