@@ -158,10 +158,9 @@ describe.skipIf(!rpcUrl)(
     const state = () => JSON.parse(readFileSync(files.state, "utf8"));
     const positionsOf = (token: Address): Position[] =>
       state().positions.filter((p: Position) => isAddressEqual(p.token, token));
-    const journalOf = (token: Address) =>
-      readJournal(agentHome)
-        .filter((r) => isAddressEqual(r.token, token))
-        .map((r) => r.side);
+    const recordsOf = (token: Address) =>
+      readJournal(agentHome).filter((r) => isAddressEqual(r.token, token));
+    const journalOf = (token: Address) => recordsOf(token).map((r) => r.side);
 
     /** Waits for the first event matching `match`; fails with the log so far. */
     async function event(match: (e: AutopilotEvent) => boolean, timeoutMs = 60_000) {
@@ -347,6 +346,9 @@ describe.skipIf(!rpcUrl)(
       await dead(crashing);
       expect(journalOf(token)).toEqual(["buy"]);
       expect(positionsOf(token)).toEqual([]); // the crash came before the position was recorded
+      // The checkpointed trade id reached that trade's own journal record through `execute`.
+      expect(state().pending).toMatchObject({ token, reason: "buy" });
+      expect(recordsOf(token).map((r) => r.correlationId)).toEqual([state().pending.id]);
 
       await start();
       expect(positionsOf(token)).toEqual([
@@ -370,6 +372,8 @@ describe.skipIf(!rpcUrl)(
       await dead(crashing);
       expect(journalOf(token)).toEqual(["buy", "sell"]);
       expect(positionsOf(token)).toEqual([expect.objectContaining({ takeProfitDone: false })]);
+      expect(state().pending).toMatchObject({ token, reason: "take_profit" });
+      expect(recordsOf(token)[1]?.correlationId).toBe(state().pending.id);
 
       await start();
       expect(positionsOf(token)).toEqual([

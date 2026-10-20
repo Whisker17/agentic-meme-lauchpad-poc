@@ -114,6 +114,8 @@ export interface ExecuteOptions {
   lock?: SendLockOptions;
   /** Longest wait for the receipt once the sponsor settled; default 60 s. */
   receiptTimeoutMs?: number;
+  /** Written into this transaction's journal records, so the caller can find them later. */
+  correlationId?: string;
 }
 
 export interface ExecuteResult {
@@ -235,7 +237,9 @@ export async function execute(o: ExecuteOptions): Promise<ExecuteResult> {
         if (receipt.status !== "success") {
           throw new ExecutionRevertedError({ reason: `Transaction ${hash} reverted` });
         }
-        const trades = tradesOf(receipt, o.launchpad, o.session.account, o.session.keyHash);
+        const trades = tradesOf(receipt, o.launchpad, o.session.account, o.session.keyHash).map(
+          (r) => (o.correlationId === undefined ? r : { ...r, correlationId: o.correlationId }),
+        );
         appendJournal(o.home, trades);
         return { hash, receipt, trades };
       },

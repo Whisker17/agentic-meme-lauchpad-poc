@@ -2,6 +2,7 @@
 // pure strategy engine (meme-sdk `decide`) and trades through the SDK's `execute` (send lock,
 // journal). Its files live in `<agentHome>/meme/autopilot/`.
 import { type ChildProcess, spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import {
   appendFileSync,
   closeSync,
@@ -361,14 +362,14 @@ interface PositionState {
 /**
  * The autopilot trade being sent, checkpointed before the send. A trade that confirms is applied
  * to the positions at once; when the daemon died first, the next start applies it from the journal
- * (the only accounting source, D33): the session's trade of that token and side appended after
- * `journalLength` records.
+ * (the only accounting source, D33): the journal record carrying this trade's `id` (`execute`'s
+ * `correlationId`), never another trade of that token and side, such as a manual one.
  */
 interface PendingTrade {
   token: Address;
   symbol: string;
   reason: "buy" | "take_profit" | "max_hold";
-  journalLength: number;
+  id: string;
 }
 
 interface DaemonState {
@@ -519,7 +520,7 @@ async function daemon(
     if (ended) throw ended;
 
     const previous = readJson(f.state) as DaemonState | null;
-    if (previous?.pending) recover(previous, previous.pending, ctx.home, session.keyHash);
+    if (previous?.pending) recover(previous, previous.pending, ctx.home);
     const now = new Date().toISOString();
     state = {
       status: "running",
@@ -720,16 +721,10 @@ function apply(state: DaemonState, t: PendingTrade, blockNumber: bigint) {
 }
 
 /** Applies the pending trade of a daemon that died during it, if the journal shows it confirmed. */
-function recover(state: DaemonState, t: PendingTrade, home: string, keyHash: Hex) {
-  const side = t.reason === "buy" ? "buy" : "sell";
-  const confirmed = readJournal(home)
-    .slice(t.journalLength)
-    .find(
-      (r) =>
-        r.keyHash.toLowerCase() === keyHash.toLowerCase() &&
-        isAddressEqual(r.token, t.token) &&
-        r.side === side,
-    );
+export function recover(state: DaemonState, t: PendingTrade, home: string) {
+  const confirmed = readJournal(home).find(
+    (r) => r.correlationId !== undefined && r.correlationId === t.id,
+  );
   if (confirmed) apply(state, t, confirmed.blockNumber);
 }
 
@@ -743,16 +738,18 @@ async function send(
   calls: readonly Call[],
 ) {
   const { ctx, client, session, state } = run;
-  const pending = {
-    token: a.token,
-    symbol: a.symbol,
-    reason: a.reason,
-    journalLength: readJournal(ctx.home).length,
-  };
+  const pending = { token: a.token, symbol: a.symbol, reason: a.reason, id: randomUUID() };
   state.pending = pending;
   save(run);
   try {
-    const result = await execute({ session, client, home: ctx.home, launchpad: ctx.pad, calls });
+    const result = await execute({
+      session,
+      client,
+      home: ctx.home,
+      launchpad: ctx.pad,
+      calls,
+      correlationId: pending.id,
+    });
     if (ctx.env[CRASH_ENV] === a.reason) process.kill(process.pid, "SIGKILL");
     apply(state, pending, result.receipt.blockNumber);
     return result;

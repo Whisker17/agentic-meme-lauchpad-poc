@@ -141,8 +141,9 @@ given), `state.json` (`{status: running|stopped|session_ended, pid, startedAt, u
 account, keyHash, fromBlock, budgetExhausted, positions: [{token, symbol, openedBlock, openedAt,
 status: open|closed|completed|unmanaged, takeProfitDone}], pending}`; `openedAt` is the chain time
 of `openedBlock`, `null` until that block was read; `pending` is `{token, symbol, reason:
-buy|take_profit|max_hold, journalLength}` while a trade is being sent, else `null`, and a restart
-records it from the journal if it confirmed), `events.jsonl` and `daemon.log` (the
+buy|take_profit|max_hold, id}` while a trade is being sent, else `null`, and a restart
+records it if the journal holds a record with `correlationId` = that `id`; a manual trade never
+counts), `events.jsonl` and `daemon.log` (the
 daemon's own stderr).
 
 Events (`events.jsonl`, one JSON object per line, `at` = ISO wall-clock time):
