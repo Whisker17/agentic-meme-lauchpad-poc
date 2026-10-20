@@ -1,7 +1,9 @@
 # mantle-agentic-meme-launchpad — Design (spec of record)
 
-> **Status:** v0.2 (2026-10-20), from the owner design interview (Appendix A), amended by an
+> **Status:** v0.3 (2026-10-20), from the owner design interview (Appendix A), amended by an
 > independent design review (Appendix B, findings R-1…R-8).
+> v0.3: the facts measured and the decisions taken in 0.1.0 are recorded in place, each marked
+> "(measured 0.1.0)" or "(decision 2026-10-20)".
 
 > **Nature:** proof of concept on Mantle Sepolia. **The contracts are not audited.**
 > **Upstream:** `mantle-7702-sdk` v0.1.4 (`@0xwh1sker/mantle-aa-{sdk,sponsor,cli}`), whose
@@ -56,6 +58,8 @@ are a secondary deliverable, usable as a reference implementation.
 | A session can sell only what it bought through `LAUNCHPAD_BUY` (D1, per-key inventory) | AA-DESIGN §4.2.6 |
 | `ruleKind NONE` allows any listed selector on any target except a quote asset and the hook | AA-DESIGN `docs/policy.md` |
 | The SDK's local simulation replicates the hook call by call, then runs the batch in `eth_call`; it does not read the BUY token's balance before the call | `packages/sdk/src/session/session.ts` |
+| (measured 0.1.0) `MemeLaunchpad` is deployed on Mantle Sepolia at `0xB7E6E09Bc2dF2b078A9171abA68663f13E2bc985` (block 45464993), quote MockUSD, treasury `0x660e3265781026a148fa6e5Ccbc8fAa76B79B928`, curve parameters as §4.2 | `deployments/mantle-sepolia.json` (deploy tx, code hashes, smoke txs), PR #8 |
+| (measured 0.1.0) Create + approve + dev buy on the predicted address in one batch works, on the full sponsor path and sent directly to the account (§7.2) | `e2e/launchpad/session.fork.test.ts`, PR #5 |
 | MockUSD `0xDA74…7526` (6 decimals, mintable by anyone) is deployed on Mantle Sepolia | AA `deployments/mantle-sepolia.json` |
 | The sponsor accepts at most one in-flight request per account (`SPONSOR_BUSY`) | AA-DESIGN §5.2 |
 | `session grant` writes the session key into the same `MANTLE_AA_HOME` (and password) as the root key; there is no export | `packages/cli/README.md` |
@@ -138,7 +142,7 @@ mantle-agentic-meme-launchpad/
 ├─ skills/mantle-meme/   # OpenClaw skill
 ├─ e2e/                  # anvil fork suite, Sepolia acceptance script
 ├─ scripts/              # demo-up.sh / demo-down.sh, pack-check
-├─ deployments/          # mantle-sepolia.json
+├─ deployments/          # mantle-sepolia.json (MemeLaunchpad 0xB7E6…c985, measured 0.1.0)
 └─ docs/                 # DESIGN.md, usage, acceptance, demo script
 ```
 
@@ -164,7 +168,7 @@ Per token, constant product over virtual reserves:
 |---|---|
 | `TOTAL_SUPPLY` | 1,000,000,000 × 10¹⁸ |
 | `CURVE_SUPPLY` (sellable) | 800,000,000 × 10¹⁸ |
-| `RESERVED_SUPPLY` (future graduation) | 200,000,000 × 10¹⁸ |
+| `RESERVED_SUPPLY` (future graduation) | 200,000,000 × 10¹⁸ (`TOTAL_SUPPLY − CURVE_SUPPLY`, not a separate parameter) |
 | `VIRTUAL_TOKEN_0` | 1,066,666,667 × 10¹⁸ |
 | `VIRTUAL_QUOTE_0` | 200 × 10⁶ (200 mUSD) |
 | `k` | `VIRTUAL_TOKEN_0 × VIRTUAL_QUOTE_0` |
@@ -172,8 +176,10 @@ Per token, constant product over virtual reserves:
 
 - State per token: `vT` (virtual token reserve), `vQ` (virtual quote reserve), `sold`
   (`CURVE_SUPPLY` − tokens still on the curve), `realQuote` (`vQ − VIRTUAL_QUOTE_0`), `status`.
-- **Canonical price** `priceE18 = vQ · 1e18 / vT`: quote base units (6 decimals) per 10¹⁸ token
-  base units (one whole token). All arithmetic is in base units; human units are display only.
+- **Canonical price** `priceE18 = vQ · 1e36 / vT`: quote base units (6 decimals) per 10¹⁸ token
+  base units (one whole token), scaled by 10¹⁸ — ≈ 1.875 × 10¹⁷ at launch, ×16 at completion.
+  (Changed 2026-10-20 from `vQ · 1e18 / vT`, which truncates to 0 at launch with these
+  parameters.) All arithmetic is in base units; human units are display only.
 - Spot price ≈ 1.875 × 10⁻⁷ mUSD per token at start (FDV ≈ 187.5 mUSD); at completion
   `vT ≈ 266,666,667`, `vQ ≈ 800` mUSD, price ×16 (FDV ≈ 3,000 mUSD). Filling the curve takes
   ≈600 mUSD net of fees.
@@ -189,10 +195,20 @@ own MemeTokens.
 ```solidity
 enum Status { None, Trading, Completed, Graduated /* reserved, unreachable this iteration */ }
 
+struct CurveParams {           // reserved supply = totalSupply − curveSupply
+    uint256 totalSupply; uint256 curveSupply; uint256 virtualToken0; uint256 virtualQuote0; uint256 feeBps;
+}
+struct CurveState {            // field order as shipped
+    uint256 virtualToken; uint256 virtualQuote; uint256 sold; uint256 realQuote; uint256 priceE18;
+    address creator; uint64 createdAt; Status status;
+}
+
 constructor(address quoteToken, address treasury, CurveParams memory params);
 
 function quoteToken() external view returns (address);                           // immutable
 function treasury() external view returns (address);                             // immutable
+// Public immutables: TOTAL_SUPPLY, CURVE_SUPPLY, VIRTUAL_TOKEN_0, VIRTUAL_QUOTE_0, FEE_BPS,
+// K (= VIRTUAL_TOKEN_0 × VIRTUAL_QUOTE_0); public state: protocolFees, creatorFees(token).
 
 function createToken(string name, string symbol, string description, string imageUrl, bytes32 salt)
     external returns (address token);
@@ -229,10 +245,19 @@ event CreatorFeesClaimed(address indexed token, address indexed creator, uint256
 event ProtocolFeesClaimed(uint256 amount);
 ```
 
+Errors (measured 0.1.0, `contracts/src/MemeLaunchpad.sol`): `UnknownToken` (not registered),
+`CurveAlreadyCompleted` (status is not `Trading`; decision 2026-10-20: the error is renamed and the
+event keeps the name `CurveCompleted`, because solc rejects an error and an event sharing one
+identifier), `InsufficientOutput` (`out < minOut`), `ZeroOutput`, `ZeroAmount`, `Expired`,
+`NotCreator`, `InvalidParams` (constructor). The CLI maps the first three to exit 42 / 40 / 41
+(§6.3).
+
 #### 4.3.1 createToken
 
 - Free; anyone. `salt' = keccak256(abi.encode(msg.sender, salt))`; deploys MemeToken with
   CREATE2 (init code includes name and symbol, hence the `predictTokenAddress` arguments).
+  (measured 0.1.0) The init code is `MemeToken.creationCode ++ abi.encode(name, symbol,
+  TOTAL_SUPPLY)`, matching the MemeToken constructor `(name, symbol, supply)` (§4.4).
 - The new token mints `TOTAL_SUPPLY` to the launchpad; the launchpad registers it, records
   `creator = msg.sender`, `createdAt`, and the initial reserves; status `Trading`.
 - **No payment and no tokens to the caller** in this call, so the hook needs no rule for it and
@@ -242,7 +267,8 @@ event ProtocolFeesClaimed(uint256 amount);
 
 #### 4.3.2 buy
 
-1. `isRegistered[token]`, `status == Trading`, `block.timestamp ≤ deadline`, `amountIn > 0`.
+1. `isRegistered(token)` (else `UnknownToken`), `status == Trading` (else
+   `CurveAlreadyCompleted`), `block.timestamp ≤ deadline`, `amountIn > 0`.
 2. Normal case: `amountInUsed = amountIn`, `feeUsed = ceil(amountInUsed × FEE_BPS / 10_000)`,
    `netUsed = amountInUsed − feeUsed`, `out = vT − ceil(k / (vQ + netUsed))`.
 3. If `out ≥ r` (tokens still on the curve) → **truncate** (§4.3.3), which recomputes
@@ -260,10 +286,13 @@ When the requested buy would take at least the remaining curve tokens `r` (norma
 
 - `netNeeded = ceil(k / (vT − r)) − vQ`;
 - `amountInUsed` = the smallest `x` with `x − ceil(x · FEE_BPS / 10_000) ≥ netNeeded`
-  (closed form `ceil(netNeeded · 10_000 / (10_000 − FEE_BPS))`, then `+1` while the inequality
-  fails); `amountInUsed ≤ amountIn` by construction;
-- `feeUsed = ceil(amountInUsed · FEE_BPS / 10_000)`, `netUsed = amountInUsed − feeUsed ≥
-  netNeeded` (dust above `netNeeded` goes into `vQ`, so `vQ · vT ≥ k` still holds);
+  = `ceil(netNeeded · 10_000 / (10_000 − FEE_BPS))`; `amountInUsed ≤ amountIn` by construction.
+  (measured 0.1.0) The closed form is exact and minimal (proof in the `quoteBuy` comment of
+  `contracts/src/MemeLaunchpad.sol`, covered by fuzz tests), so the former "`+1` while the
+  inequality fails" step never runs and is not implemented;
+- `feeUsed = ceil(amountInUsed · FEE_BPS / 10_000)`, `netUsed = amountInUsed − feeUsed`;
+  (measured 0.1.0) `netUsed == netNeeded` exactly, so `vQ` ends at `ceil(k / (vT − r))` and
+  `vQ · vT ≥ k` still holds;
 - `out = r`; reserves, `realQuote` and fee ledgers are updated from `netUsed` / `feeUsed` only;
   exactly `amountInUsed` is pulled; status → `Completed`.
 
@@ -305,15 +334,16 @@ immutable `treasury`.
 ### 4.4 MemeToken
 
 OpenZeppelin ERC20, 18 decimals, no fee / rebase / hooks / callbacks, freely transferable.
-`launchpad` immutable (= deployer). One privileged entry `launchpadTransfer(from, amount)`,
+Constructor `(name, symbol, supply)` mints `supply` (`TOTAL_SUPPLY`) to the deployer (measured
+0.1.0). `launchpad` immutable (= deployer). One privileged entry `launchpadTransfer(from, amount)`,
 callable only by the launchpad, moving exactly `amount` from `from` to the launchpad. No mint
 after construction; no burn; no owner.
 
 ### 4.5 Lifecycle
 
 `None → Trading` (createToken) `→ Completed` (curve sold out; buy and sell revert with
-`CurveCompleted`). `Graduated` is declared but unreachable. A position held at completion cannot
-be sold through this launchpad (accepted). The CLI and the skill report it as: "Curve completed;
+`CurveAlreadyCompleted`). `Graduated` is declared but unreachable. A position held at completion
+cannot be sold through this launchpad (accepted). The CLI and the skill report it as: "Curve completed;
 trading is disabled. This v1 launchpad has no migration path, so the position is stranded."
 "Graduated" is reserved for a future version that actually migrates.
 
@@ -420,9 +450,9 @@ Meme codes:
 
 | Exit | `error.code` | Meaning |
 |---|---|---|
-| 40 | `CURVE_COMPLETED` | Curve completed; trading is disabled; v1 has no migration path |
-| 41 | `SLIPPAGE` | Output below `minOut` |
-| 42 | `UNKNOWN_TOKEN` | Not registered on this launchpad, or a missing / ambiguous symbol (≤ 10 candidates listed) |
+| 40 | `CURVE_COMPLETED` | Curve completed; trading is disabled; v1 has no migration path (revert `CurveAlreadyCompleted`) |
+| 41 | `SLIPPAGE` | Output below `minOut` (revert `InsufficientOutput`) |
+| 42 | `UNKNOWN_TOKEN` | Not registered on this launchpad (revert `UnknownToken`), or a missing / ambiguous symbol (≤ 10 candidates listed) |
 | 43 | `INSUFFICIENT_BALANCE` | The account's MockUSD (or token) balance is too low (11 is the policy limit) |
 | 44 | `AUTOPILOT_STATE` | Already running / not running |
 
@@ -440,12 +470,19 @@ single `sell` call, `amount ≤` this session's inventory (checked locally, exit
 `salt` random → `predictTokenAddress(account, salt, name, symbol)` → batch
 `[createToken(…, salt), approve(MockUSD, dev), buy(predicted, dev, minOut, …)]`. The hook checks
 each call separately: `createToken` is `NONE`; the BUY's balance delta is credited to inventory.
-The sponsor decodes only the outer `execute` envelope and simulates the whole transaction with
-`eth_estimateGas` (`packages/sponsor/src/auth.ts`, `policy.ts`, `server.ts`), so nothing reads
-the predicted token before it exists. Fork test required on the **full sponsor path** (session
+(measured 0.1.0) The hook **does** read the predicted token: `AgentPolicyHook._checkTrade` calls
+`balanceOf(account)` on the BUY token in the BUY's `beforeExecute`. This works because Calibur
+runs `beforeExecute` / `afterExecute` around **each call**, not once per batch, so the read
+happens after `createToken` has deployed the token (call traces on the fork). The sponsor decodes
+only the outer `execute` envelope and simulates the whole transaction with `eth_estimateGas`
+(`packages/sponsor/src/auth.ts`, `policy.ts`, `server.ts`); `verifyOnChain` reads only the
+account, the key and the hook summary. Fork test required on the **full sponsor path** (session
 signed batch → `sponsor_relay` → `verifyOnChain` → `eth_estimateGas` → relayer submission), not
-only `AgentSession.simulate` (§10, spike in 0.1.0). Reusing the same creator / salt / name /
-symbol collides and reverts; the SDK always draws a random salt.
+only `AgentSession.simulate` (§10). (measured 0.1.0) Spike **PASS** on an anvil fork, on the full
+sponsor path and sent directly to the account: the predicted address is the created token, and
+the account's balance, hook inventory and `Trade.tokenAmount` all equal the quote
+(`e2e/launchpad/session.fork.test.ts`, PR #5). The two-transaction fallback is not needed.
+Reusing the same creator / salt / name / symbol collides and reverts; the SDK always draws a random salt.
 
 ### 7.3 Autopilot
 
@@ -622,7 +659,10 @@ once on Mantle Sepolia producing `docs/acceptance.md` with every transaction lin
   processes, CLI exit-code mapping.
 - **Must not be cut** under schedule pressure: final-buy fuzz / invariants, real-hook
   integration, sponsor-path create + buy, inventory attribution, revoke + allowance reset.
-- **Security review:** a contract review checkpoint in 0.1.0, before the Sepolia deployment;
+- **Security review:** a contract review checkpoint in 0.1.0, before the Sepolia deployment
+  (measured 0.1.0: **PASS**, `docs/reviews/0.1.0.md`; two Low findings: CR-01 invariant
+  coverage, fixed in PR #7; CR-02 overflow on oversized buy budgets, deferred in
+  `docs/DEFERRED_ISSUES.md`);
   the final independent review in 0.1.4, after the demo recording in 0.1.3 (D34). README and demo
   material state "POC, not audited"; sponsor hot wallet and market-sim wallets hold testnet
   amounts only.
@@ -664,14 +704,14 @@ review gates, release branches).
 
 | Item | Handling |
 |---|---|
-| Create + buy-on-predicted-token in one batch may trip the SDK simulation, the sponsor or the hook | Source review found no blocker (§7.2); spike on the full sponsor path in 0.1.0; fallback: two transactions (create, then dev buy) |
+| Create + buy-on-predicted-token in one batch may trip the SDK simulation, the sponsor or the hook | Closed (measured 0.1.0): spike PASS on the full sponsor path and direct (§7.2); the two-transaction fallback is not needed |
 | Journal loss or a second session | Cost basis `null`, autopilot leaves the position alone; sell sizing stays on-chain; one session per account is the supported scope |
 | Public RPC lag breaks sniping latency or the watcher | Overlap re-scan, dedup; configurable RPC URL |
 | Sponsor budget drained by autopilot | Sponsor daily budget + per-account gas cap; the policy caps principal, not gas |
 | Positions stranded at `Completed` | Accepted; reported to the user; graduation is a later version |
 | Truncation leaves an allowance | Analysed in §4.3.3; trusted spender only; reset on revoke |
 | OpenClaw version drift | Skill only, no plugin; pin the tested OpenClaw version in docs |
-| Unaudited contracts | Invariants, anti-theft tests, review, testnet only |
+| Unaudited contracts | Invariants, anti-theft tests, review (0.1.0 checkpoint PASS, `docs/reviews/0.1.0.md`; CR-02 deferred in `docs/DEFERRED_ISSUES.md`), testnet only |
 
 ## Appendix A: Design interview record (2026-10-20)
 
@@ -708,7 +748,10 @@ Also settled in review:
 
 - **Sponsor path (Q-a):** the sponsor decodes only the outer envelope and simulates with
   `eth_estimateGas`; create + approve + buy on a predicted address is not blocked off-chain. The
-  0.1.0 spike must run the full sponsor path.
+  0.1.0 spike must run the full sponsor path. (measured 0.1.0) Spike PASS on the full sponsor
+  path and direct. On-chain, the hook does read the predicted token (in the BUY's
+  `beforeExecute`); it is safe because Calibur runs the hooks around each call, after
+  `createToken` deployed the token (§7.2).
 - **On-chain shape (Q-b):** CREATE2 salt bound to `msg.sender`, full supply minted to the
   launchpad, `Completed` stopping both sides and no admin path for the reserve are compatible
   with AA-DESIGN §4.4.

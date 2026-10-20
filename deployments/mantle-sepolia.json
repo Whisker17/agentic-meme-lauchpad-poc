@@ -1,0 +1,68 @@
+{
+  "chainId": 5003,
+  "MemeLaunchpad": {
+    "address": "0xB7E6E09Bc2dF2b078A9171abA68663f13E2bc985",
+    "deployTx": "0xef6103eead04e66dd038e2540eded74acec03d82dbd6b843fa790c17dcc872dc",
+    "block": 45464993,
+    "deployer": "0x3879535B5f0Fc0c663cAb4eC3efB37dF5d4433b0",
+    "method": "create",
+    "nonce": 0,
+    "initCodeHash": "0x6efb7438f3cd0c730631a9b0d40ad1b6802cd3acda8b4005f16d191fca819e02",
+    "runtimeCodeHash": "0xb74d4694fa642b83b873d4b23223f3dc883b42800ffd3756c3ae70788a65e917",
+    "compiler": {
+      "solc": "0.8.29+commit.ab55807c",
+      "evmVersion": "prague",
+      "optimizer": true,
+      "optimizerRuns": 1000,
+      "viaIr": false,
+      "bytecodeHash": "ipfs",
+      "foundryProfile": "default"
+    },
+    "source": {
+      "repository": "https://github.com/Whisker17/agentic-meme-lauchpad-poc",
+      "commit": "ee2d532eb6492d5dbeae73b8af5f960c46ad732e",
+      "contract": "contracts/src/MemeLaunchpad.sol:MemeLaunchpad",
+      "script": "contracts/script/DeployLaunchpad.s.sol:DeployLaunchpad"
+    },
+    "quoteToken": "0xDA74D3F269F4aF7a3a5eFFf81Bf64384De327526",
+    "treasury": "0x660e3265781026a148fa6e5Ccbc8fAa76B79B928",
+    "curve": {
+      "totalSupply": "1000000000000000000000000000",
+      "curveSupply": "800000000000000000000000000",
+      "virtualToken0": "1066666667000000000000000000",
+      "virtualQuote0": "200000000",
+      "feeBps": 100
+    },
+    "constructorArgs": {
+      "signature": "constructor(address quoteToken_, address treasury_, (uint256 totalSupply, uint256 curveSupply, uint256 virtualToken0, uint256 virtualQuote0, uint256 feeBps) p)",
+      "values": [
+        "0xDA74D3F269F4aF7a3a5eFFf81Bf64384De327526",
+        "0x660e3265781026a148fa6e5Ccbc8fAa76B79B928",
+        [
+          "1000000000000000000000000000",
+          "800000000000000000000000000",
+          "1066666667000000000000000000",
+          "200000000",
+          "100"
+        ]
+      ],
+      "encoded": "0x000000000000000000000000da74d3f269f4af7a3a5efff81bf64384de327526000000000000000000000000660e3265781026a148fa6e5ccbc8faa76b79b9280000000000000000000000000000000000000000033b2e3c9fd0803ce800000000000000000000000000000000000000000000000295be96e640669720000000000000000000000000000000000000000000000003725373e24b705ab7cc0000000000000000000000000000000000000000000000000000000000000bebc2000000000000000000000000000000000000000000000000000000000000000064"
+    },
+    "smoke": {
+      "account": "0x3879535B5f0Fc0c663cAb4eC3efB37dF5d4433b0",
+      "token": "0x02cf463821b2cC2d46D989a46b1DD69EFf44A44E",
+      "name": "Smoke Meme",
+      "symbol": "SMOKE",
+      "salt": "0x626199c6578ffa911d4f7a24e9dfd4b9fae95567dfb1441cb198d94689b21044",
+      "txs": {
+        "mintQuote": "https://sepolia.mantlescan.xyz/tx/0xc1fcb5614c01d674a3e965729c8682d7b3edd4ca7d961d0d049a1688481ba5d7",
+        "createToken": "https://sepolia.mantlescan.xyz/tx/0xc0c104a23dc120b149dd6581ccc76899e5827f93b56fbcbe29b9cb45838f776d",
+        "approve": "https://sepolia.mantlescan.xyz/tx/0xd68cb1e8389d9d22d7be075f98f476974684bcb03087cc8d6671c8d3d1d94173",
+        "buy": "https://sepolia.mantlescan.xyz/tx/0x5f154fd5aa0e7c5ef6f13a6f9e4c96fb1fa849aa49f83b16f149c54ee086d752",
+        "sell": "https://sepolia.mantlescan.xyz/tx/0xb44948b03a5f83f805edafca6a1c975dffb205b5b56d6a7979906665714bf73e"
+      },
+      "note": "Plain EOA: mint 100 mUSD, createToken, approve 10 mUSD, buy 10 mUSD (50,309,671.29 tokens), sell half of them."
+    },
+    "sourceNote": "Built from the default profile at source.commit (contracts/src/MemeLaunchpad.sol is git blob 0cf428ec8c4ee1f9115ed8ade8242ff961b56b14, MemeToken.sol dd9da241938aa5bc7146571127e4f9c95f7eb529). initCodeHash = keccak256(creationCode ++ constructorArgs.encoded). The runtime code has no address-dependent immutables, so runtimeCodeHash equals a local deployment with the same arguments. Check with the script's verify()."
+  }
+}
