@@ -21,6 +21,7 @@ import {
   type TransactionReceipt,
 } from "viem";
 import { getTransactionReceipt, readContract } from "viem/actions";
+import { predictTokenAddress } from "./calls.js";
 import { InsufficientBalanceError, SlippageError, toMemeError } from "./errors.js";
 import { memeLaunchpadAbi } from "./generated.js";
 import { appendJournal, type JournalRecord, tradesOf } from "./journal.js";
@@ -140,8 +141,8 @@ const BARE_CALL_FAILED = "0x3204506f";
  * against the chain now, in the contract's order: the quote view's revert (`UnknownTokenError`,
  * `CurveCompletedError`), the account's balance against the quote's actual input
  * (`InsufficientBalanceError`), then the quoted output against `minOut` (`SlippageError`). A buy
- * of a token the same batch creates is checked for balance only. Revert data that names another
- * error is kept: anything else is returned as `toMemeError(error)`.
+ * of a token a preceding call of the batch creates is checked for balance only. Revert data that
+ * names another error is kept: anything else is returned as `toMemeError(error)`.
  */
 export async function diagnoseFailure(
   client: Client,
@@ -163,11 +164,17 @@ export async function diagnoseFailure(
         return [];
       }
     });
-  const creates = decoded.some((f) => f.functionName === "createToken");
+  /** The tokens the preceding calls create (the account is their creator). */
+  const created = new Set<string>();
   for (const f of decoded) {
+    if (f.functionName === "createToken") {
+      const [name, symbol, , , salt] = f.args;
+      created.add(predictTokenAddress(launchpad, account, salt, name, symbol).toLowerCase());
+    }
     if (f.functionName !== "buy" && f.functionName !== "sell") continue;
     const [token, amount, minOut] = f.args;
     const isBuy = f.functionName === "buy";
+    const creates = created.has(token.toLowerCase());
     const found = await (async (): Promise<Error | undefined> => {
       // The quote view reverts as the trade would (unknown token, completed curve); a buy pulls
       // only the quote's `amountInUsed`. A token the batch creates has no quote yet.
