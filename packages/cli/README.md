@@ -113,10 +113,13 @@ through the same send lock and journal as the commands. The strategy file:
   `excludeOwn` `true`, `maxOpenPositions` 10 (integer ≥ 1), `maxEntryPriceMultiple` 2 (≥ 1),
   `slippagePercent` 3 (0–100). `stopLossPercent` must be `null` or absent. Unknown fields are
   refused. A bad strategy is exit 1 (`USAGE`).
-- Entry: a `TokenCreated` whose age when observed (chain time) is at most `maxAgeSeconds`, not
-  created by the account (`excludeOwn`), whose name or symbol contains a keyword
-  (case-insensitive), whose spot price is at most `maxEntryPriceMultiple` × the launch price,
-  while fewer than `maxOpenPositions` are open. Then the hook's `remainingLimit` and the account's
+- Entry: a `TokenCreated` whose age when observed is at most `maxAgeSeconds`: the latest block's
+  timestamp the watcher reads right after the poll that returned the event (never a block before
+  the event's), kept while the event waits behind a busy daemon; if that read fails, the chain time
+  of the step that processes it. The token must not be created by the account (`excludeOwn`), its
+  name or symbol must contain a keyword (case-insensitive), its spot price must be at most
+  `maxEntryPriceMultiple` × the launch price, and fewer than `maxOpenPositions` may be open. Then
+  the hook's `remainingLimit` and the account's
   MockUSD balance must both cover `amountPerToken`; the first shortfall is `budget_exhausted` and
   the daemon enters nothing more until restarted. The buy is re-quoted right before the send.
 - Exit: on every `Trade` of a held token and on every tick, the net sell value of
@@ -135,8 +138,11 @@ through the same send lock and journal as the commands. The strategy file:
 
 Files in `<MANTLE_AA_HOME>/meme/autopilot/`: `pid` (the running daemon), `strategy.json` (as
 given), `state.json` (`{status: running|stopped|session_ended, pid, startedAt, updatedAt,
-account, keyHash, fromBlock, budgetExhausted, positions: [{token, symbol, openedAt, status:
-open|closed|completed|unmanaged, takeProfitDone}]}`), `events.jsonl` and `daemon.log` (the
+account, keyHash, fromBlock, budgetExhausted, positions: [{token, symbol, openedBlock, openedAt,
+status: open|closed|completed|unmanaged, takeProfitDone}], pending}`; `openedAt` is the chain time
+of `openedBlock`, `null` until that block was read; `pending` is `{token, symbol, reason:
+buy|take_profit|max_hold, journalLength}` while a trade is being sent, else `null`, and a restart
+records it from the journal if it confirmed), `events.jsonl` and `daemon.log` (the
 daemon's own stderr).
 
 Events (`events.jsonl`, one JSON object per line, `at` = ISO wall-clock time):

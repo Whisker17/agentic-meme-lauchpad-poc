@@ -587,7 +587,7 @@ export interface LoopOptions {
 
 /** Runs steps on watcher events and on every tick until aborted; a `SessionEnded` escapes. */
 async function loop(run: Run, o: LoopOptions): Promise<void> {
-  const queue: LaunchpadEvent[] = [];
+  const queue: Queued[] = [];
   let wake: (() => void) | undefined;
   let lastWatchError: string | undefined;
   // The watcher stops with the loop, whether it was stopped or the session ended.
@@ -606,7 +606,11 @@ async function loop(run: Run, o: LoopOptions): Promise<void> {
       },
     })) {
       lastWatchError = undefined;
-      queue.push(log);
+      queue.push(
+        log.eventName === "TokenCreated"
+          ? { ...log, observedAt: await observedAt(run, log, o) }
+          : log,
+      );
       wake?.();
     }
   })();
@@ -656,6 +660,25 @@ async function loop(run: Run, o: LoopOptions): Promise<void> {
   } finally {
     done.abort();
     await watcher.catch(() => {});
+  }
+}
+
+/** A watcher event; a `TokenCreated` carries the chain time it was observed at. */
+type Queued = LaunchpadEvent & { observedAt?: bigint | undefined };
+
+/**
+ * The chain time the watcher saw a log at: the head right after its poll, never a block before
+ * the log's. Unread (an RPC error): `undefined`, the step's chain time is used instead.
+ */
+async function observedAt(run: Run, log: LaunchpadEvent, o: LoopOptions) {
+  try {
+    const head = await getBlock(run.client);
+    if (head.number >= log.blockNumber) return head.timestamp;
+    return (await getBlock(run.client, { blockNumber: log.blockNumber })).timestamp;
+  } catch (e) {
+    const { error } = describe(e);
+    o.emit("error", { source: "watch", ...error, message: redactUrls(error.message) });
+    return undefined;
   }
 }
 
@@ -730,7 +753,7 @@ async function send(
 /** One decision: read what the engine needs, decide, act on each action in order. */
 async function step(
   run: Run,
-  events: LaunchpadEvent[],
+  events: Queued[],
   tick: boolean,
   emit: LoopOptions["emit"],
 ): Promise<void> {
@@ -745,7 +768,9 @@ async function step(
   const held = (t: Address) => open.find((p) => isAddressEqual(p.token, t));
 
   const created = events.flatMap((e) =>
-    e.eventName === "TokenCreated" && !held(e.args.token) ? [e.args] : [],
+    e.eventName === "TokenCreated" && !held(e.args.token)
+      ? [{ ...e.args, observedAt: e.observedAt ?? now }]
+      : [],
   );
   const observed: ObservedToken[] = await Promise.all(
     created.map(async (a) => {
@@ -756,7 +781,7 @@ async function step(
         symbol: a.symbol,
         creator: getAddress(a.creator),
         createdAt: s.createdAt,
-        observedAt: now,
+        observedAt: a.observedAt,
         priceE18: s.priceE18,
         trading: s.status === "trading",
       };
