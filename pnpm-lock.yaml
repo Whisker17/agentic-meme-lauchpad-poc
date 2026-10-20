@@ -62,6 +62,19 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
+  tools/market-sim:
+    dependencies:
+      '@0xwh1sker/mantle-meme-sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      viem:
+        specifier: 2.57.7
+        version: 2.57.7(typescript@7.0.2)
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
 packages:
 
   '@0xwh1sker/mantle-aa-cli@0.1.5':

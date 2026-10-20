@@ -1,4 +1,4 @@
-export const VERSION = "0.1.1";
+export const VERSION = "0.1.2";
 
 export * from "./calls.js";
 export * from "./curve.js";
@@ -11,3 +11,4 @@ export * from "./journal.js";
 export * from "./lock.js";
 export * from "./portfolio.js";
 export * from "./quotes.js";
+export * from "./strategy.js";

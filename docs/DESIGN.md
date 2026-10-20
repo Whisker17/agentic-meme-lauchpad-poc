@@ -401,7 +401,9 @@ iteration means a new launchpad version; tokens completed on v1 are not migrated
   (re-scan a 5-block overlap).
 - **Journal** `<agentHome>/meme/journal.jsonl`: one record per confirmed submission of this
   session `{keyHash, txHash, token, side, quotePulled, tokens, fee, blockNumber}`, amounts taken
-  from that transaction's own `Trade` logs in the receipt. It is the **only** source of cost
+  from that transaction's own `Trade` logs in the receipt. (fixed 0.1.2 review) An optional
+  `correlationId`, given to `execute` by the caller (the autopilot's trade id), is written into that
+  transaction's records; manual trades carry none, and records without it read as before. It is the **only** source of cost
   basis; there is no historical event scan by account (the `Trade` event cannot tell two
   sessions of one account apart).
   (fixed 0.1.1 review) A crash mid-append can leave a torn last line without its newline. Reading
@@ -451,6 +453,13 @@ iteration means a new launchpad version; tokens completed on v1 are not migrated
   through unchanged as the AA error (exit 30 for a revert). `toMemeError` also decodes the launchpad
   errors from a view's revert data (`packages/sdk/src/{errors,executor}.ts`).
 - **Strategy engine** (pure, unit-tested): `(strategy, events, positions, now) → actions`.
+  (measured 0.1.2) `decide({strategy, params, account, now, observed, positions, openPositions,
+  budget, budgetExhausted}) → Action[]` (`buy`, `skip` with a reason, `budget_exhausted`, `sell`
+  with `take_profit` / `max_hold`, `curve_completed`); `parseStrategy` validates the §7.3 file into
+  base units and basis points (`packages/sdk/src/strategy.ts`). It values a sale with the local
+  curve model (`simulateSell`), which the anvil suite checks against `quoteBuy` / `quoteSell` over
+  a fuzzed trade sequence (`packages/sdk/test/launchpad.anvil.test.ts`). The daemon itself lives in
+  the CLI (`packages/cli/src/autopilot.ts`), which owns the exit-code mapping it stops on (§7.3).
 
 ## 6. CLI (`mantle-meme`)
 
@@ -490,6 +499,13 @@ reference for every `--json` result:
   `{event, blockNumber, transactionHash, logIndex, args}`.
 - `policy init --expiry` accepts only `24h` (§6.2).
 - `autopilot *` is not shipped in 0.1.1 (0.1.2).
+
+(measured 0.1.2) `autopilot start --strategy <file> | stop | status | log [--since <duration>]`
+shipped as above; the `--json` results, the files and the events are in `packages/cli/README.md`.
+Besides the Telegram pair, the autopilot reads `MANTLE_MEME_TG_API_URL` (the Bot API base URL,
+default `https://api.telegram.org`), `MANTLE_MEME_AUTOPILOT_TICK_MS` (default 10000) and
+`MANTLE_MEME_AUTOPILOT_POLL_MS` (the watcher's poll, default 2000), so tests drive it against a
+mock Bot API without real-time waits.
 
 ### 6.2 policy init
 
@@ -540,7 +556,9 @@ Meme codes:
   including a reverted receipt the sponsor reported as a success, is exit 30
   `EXECUTION_REVERTED`. Before trading, `buy`, `sell` and `quote` check the curve (40) and resolve
   the token (42).
-- 44 is reserved until the autopilot ships (0.1.2).
+- 44 is reserved until the autopilot ships (0.1.2). (measured 0.1.2) 44 is `autopilot start` while
+  a daemon runs (its pid file names a live process) and `autopilot stop` while none runs; a
+  strategy that fails validation is exit 1 (`USAGE`).
 
 ## 7. Key flows
 
@@ -615,6 +633,59 @@ Events (`events.jsonl` and Telegram templates): `started`, `stopped`, `bought`, 
 (reason: take_profit / max_hold / stop_loss), `skipped` (reason), `budget_exhausted`,
 `curve_completed`, `session_ended`, `error`. Telegram push is sent only when the bot env vars are
 set; delivery failure never stops trading.
+
+(decision 2026-10-20) Every time is **chain time** (the latest block's timestamp): the observed
+age, the buy's `openedAt` (its block) and the max hold. On an anvil fork `evm_increaseTime` +
+`evm_mine` therefore moves the max hold without a real-time wait; `maxHoldMinutes` may also be
+fractional. The 10 s tick and the 2 s watcher poll are configurable (§6.1).
+
+(measured 0.1.2) As shipped (`packages/cli/src/autopilot.ts`, fork test
+`packages/cli/test/autopilot.fork.test.ts`):
+
+- `start` validates the strategy, refuses a running daemon (44) and spawns the detached daemon
+  (`mantle-meme autopilot daemon`, not for direct use). The daemon takes the `pid` file
+  exclusively (a racing second daemon is 44 too), checks the session, writes `strategy.json`,
+  `state.json` and `started`, and reports over IPC; `start` returns that report, or the daemon's
+  error with its exit code (e.g. 13 for a revoked key, 1 for a missing setting). `stop` is
+  SIGTERM: the daemon finishes its step, writes `stopped` and removes the pid file (SIGKILL after
+  60 s). The daemon also writes `daemon.log` (its stderr).
+- The watcher starts at the block after the current one, so a restart does not see a token twice.
+  Only positions the autopilot opened are managed (sold from the session's inventory of that
+  token); a restart manages the open positions of the previous run's `state.json` again.
+  (fixed 0.1.2 review) A trade's outcome reaches `state.json` before anything else can fail. The
+  daemon checkpoints each autopilot trade as `pending` (token, buy / take-profit / max hold, a
+  unique trade id) before the send, and `execute` writes that id into the trade's journal records
+  (`correlationId`). As soon as `execute` confirms, the trade is applied
+  (a buy opens its position, a take-profit sets `takeProfitDone`, a max hold closes it) and
+  checkpointed. A position records its buy's block (`openedBlock`). `openedAt`, that block's
+  chain time, is read when the position is next evaluated: until a read succeeds it is `null`, and
+  the failed step is retried. The state is checkpointed after every action. A start applies a
+  `pending` trade of a daemon that died before the checkpoint from the journal (D33): only the
+  record carrying that trade's id. A same-session manual trade of the same token and side carries
+  no id and is never taken for it, so a trade that never confirmed opens, marks or closes nothing
+  (`packages/cli/test/autopilot.recovery.test.ts`). Measured on the fork
+  (`packages/cli/test/autopilot.recovery.fork.test.ts`) with every block read by number failing
+  after a buy, and with the daemon killed right after a confirmed buy and after a confirmed
+  take-profit. In each case the restarted daemon managed the position once and sold it later, and
+  did not take the profit again.
+- Budget: the hook's `remainingLimit(keyHash, account, MockUSD)` and the account's MockUSD
+  `balanceOf`, read when new tokens are observed. A buy refused with 11 or 43 regardless is also
+  `budget_exhausted`. `budget_exhausted` stops entries until the next start. (fixed 0.1.2 review)
+  That includes the buys that the same decision still holds: they are not sent, and its exits
+  still run.
+- A take-profit decided on the local model is re-checked with `quoteSell` and not sent when the
+  view no longer meets it; `minOut` is the view's output less `slippagePercent`.
+- Revoke: `mantle-aa session revoke` removes the key from Calibur and tombstones it on the hook.
+  The AA SDK then refuses at `simulate`, before anything is sent, with `PolicyViolationError`
+  "Session key is not registered on the account", which the AA CLI's `describeError` maps to
+  13. An idle daemon sends nothing, so every tick reads the key's state (Calibur `isRegistered`,
+  the expiry in `getKeySettings`, the hook's `getSummary().revoked`) and stops with
+  `session_ended` on the same errors `simulate` would raise. On the fork the idle daemon emitted
+  `session_ended`, `stopped` (`reason: session_ended`) and exited within one tick of the revoke.
+- Failures: a failed buy is an `error` event (the token is not retried); a failed sell is retried
+  by the next decision. A step that fails as a whole (e.g. an RPC answering behind the logs) keeps
+  its events for up to three more steps. Telegram is pushed in order in the background (10 s
+  timeout); a failure is an `error` event with `source: telegram`, the bot token scrubbed.
 
 ### 7.4 Revoke
 
@@ -720,6 +791,17 @@ once on Mantle Sepolia producing `docs/acceptance.md` with every transaction lin
 8. Concurrency: an autopilot buy and a manual buy at the same moment both complete through the
    send lock, no `SPONSOR_BUSY` surfaced to the user.
 
+(measured 0.1.2) Items 1–8 are one ordered flow (`e2e/acceptance/flow.ts`) through the real
+binaries, the autopilot daemon, `tools/market-sim` and a `mantle-aa sponsor serve` process. CI runs
+it on the fork (`e2e/acceptance/acceptance.fork.test.ts`, 16 tests), and `e2e/acceptance/sepolia.ts`
+ran the same flow once on Mantle Sepolia (`docs/acceptance.md`). Item 4 is now the §9.1 case: a
+market-sim buy fills the curve through on-chain truncation. Item 8 is checked as follows. The
+daemon holds the send lock; the manual buy starts and quotes meanwhile; it takes the lock only
+after the daemon released it; its first `sponsor_relay` comes after the daemon's settled. No
+sponsor reply is `SPONSOR_BUSY`. With the lock disabled in the SDK, the sponsor answers
+`SPONSOR_BUSY` (which the SDK's retry hides) and the step fails. The 0.1.1 gate
+(`e2e/command/command.fork.test.ts`) stays as it was.
+
 ### 9.2 Telegram demo script (manual, recorded)
 
 1. Human, local: `policy init`, grant, `session export`, mint mUSD; `scripts/demo-up.sh`
@@ -780,7 +862,7 @@ once on Mantle Sepolia producing `docs/acceptance.md` with every transaction lin
 | AA SDK **0.1.5** (in `mantle-7702-sdk`, its own release process) | `mantle-aa session export` (+ tests, docs, npm publish) | Before meme 0.1.1 |
 | **0.1.0** — contracts | Repo scaffold + CI; MemeLaunchpad / MemeToken + full Foundry suite (unit, fuzz, invariants C1–C6, dust, anti-theft); meme-sdk builders, CREATE2 prediction, quotes; fork integration with the real AA contracts incl. the create + dev-buy spike on the full sponsor path; contract review checkpoint; Sepolia deployment + address book | CI green; review checkpoint PASS; Sepolia deployed |
 | **0.1.1** — command mode | meme-sdk discovery, symbol resolution, send lock, journal, portfolio; `mantle-meme` all non-autopilot commands + exit codes; `policy init`; consumes AA 0.1.5 (exported agent home) | Fork e2e of §9.1 items 1, 2, 5, 6 (minus 44). (measured 0.1.1) **Passed**: items 1, 2 (incl. the clamp case), 4, 5 and 6 (10, 11, 12, 41, 42; minus 44) green on the fork through the real `mantle-meme` and `mantle-aa` binaries, `e2e/command/command.fork.test.ts` 17 passed / 0 skipped (PR #15). Exit 10 is the AA SDK's local refusal there (on-chain refusal: `e2e/launchpad/session.fork.test.ts`) |
-| **0.1.2** — autopilot | Strategy engine + daemon, Telegram push, `autopilot *`; market-sim; full anvil e2e §9.1 in CI; Sepolia acceptance run → `docs/acceptance.md` | §9.1 green on fork and Sepolia |
+| **0.1.2** — autopilot | Strategy engine + daemon, Telegram push, `autopilot *`; market-sim; full anvil e2e §9.1 in CI; Sepolia acceptance run → `docs/acceptance.md` | §9.1 green on fork and Sepolia. (measured 0.1.2) **Passed** on both. Fork: items 1–8 in CI, `e2e/acceptance/acceptance.fork.test.ts` 16 passed / 0 skipped. Sepolia: 2026-10-20, commit `abbadf6`, 16/16 steps, 31 transactions; the relayer paid 0.256771 MNT, and the human and the agent held 0 MNT (`docs/acceptance.md`). Telegram was not exercised on Sepolia (no bot credentials); it is covered against a mock Bot API on the fork |
 | **0.1.3** — agent + demo | `SKILL.md`; `demo-up/down.sh`; docs (usage, demo script); TG demo §9.2 recorded | **Definition of Done** |
 | **0.1.4** — review + publish | Final independent security review (and fixes); npm publish `@0xwh1sker/mantle-meme-{sdk,cli}` | Review PASS; packages on npm. Does not block 0.1.3 |
 
