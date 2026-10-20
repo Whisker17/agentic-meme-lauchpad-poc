@@ -771,6 +771,17 @@ once on Mantle Sepolia producing `docs/acceptance.md` with every transaction lin
 8. Concurrency: an autopilot buy and a manual buy at the same moment both complete through the
    send lock, no `SPONSOR_BUSY` surfaced to the user.
 
+(measured 0.1.2) Items 1–8 are one ordered flow (`e2e/acceptance/flow.ts`) through the real
+binaries, the autopilot daemon, `tools/market-sim` and a `mantle-aa sponsor serve` process. CI runs
+it on the fork (`e2e/acceptance/acceptance.fork.test.ts`, 16 tests), and `e2e/acceptance/sepolia.ts`
+ran the same flow once on Mantle Sepolia (`docs/acceptance.md`). Item 4 is now the §9.1 case: a
+market-sim buy fills the curve through on-chain truncation. Item 8 is checked as follows. The
+daemon holds the send lock; the manual buy starts and quotes meanwhile; it takes the lock only
+after the daemon released it; its first `sponsor_relay` comes after the daemon's settled. No
+sponsor reply is `SPONSOR_BUSY`. With the lock disabled in the SDK, the sponsor answers
+`SPONSOR_BUSY` (which the SDK's retry hides) and the step fails. The 0.1.1 gate
+(`e2e/command/command.fork.test.ts`) stays as it was.
+
 ### 9.2 Telegram demo script (manual, recorded)
 
 1. Human, local: `policy init`, grant, `session export`, mint mUSD; `scripts/demo-up.sh`
@@ -831,7 +842,7 @@ once on Mantle Sepolia producing `docs/acceptance.md` with every transaction lin
 | AA SDK **0.1.5** (in `mantle-7702-sdk`, its own release process) | `mantle-aa session export` (+ tests, docs, npm publish) | Before meme 0.1.1 |
 | **0.1.0** — contracts | Repo scaffold + CI; MemeLaunchpad / MemeToken + full Foundry suite (unit, fuzz, invariants C1–C6, dust, anti-theft); meme-sdk builders, CREATE2 prediction, quotes; fork integration with the real AA contracts incl. the create + dev-buy spike on the full sponsor path; contract review checkpoint; Sepolia deployment + address book | CI green; review checkpoint PASS; Sepolia deployed |
 | **0.1.1** — command mode | meme-sdk discovery, symbol resolution, send lock, journal, portfolio; `mantle-meme` all non-autopilot commands + exit codes; `policy init`; consumes AA 0.1.5 (exported agent home) | Fork e2e of §9.1 items 1, 2, 5, 6 (minus 44). (measured 0.1.1) **Passed**: items 1, 2 (incl. the clamp case), 4, 5 and 6 (10, 11, 12, 41, 42; minus 44) green on the fork through the real `mantle-meme` and `mantle-aa` binaries, `e2e/command/command.fork.test.ts` 17 passed / 0 skipped (PR #15). Exit 10 is the AA SDK's local refusal there (on-chain refusal: `e2e/launchpad/session.fork.test.ts`) |
-| **0.1.2** — autopilot | Strategy engine + daemon, Telegram push, `autopilot *`; market-sim; full anvil e2e §9.1 in CI; Sepolia acceptance run → `docs/acceptance.md` | §9.1 green on fork and Sepolia |
+| **0.1.2** — autopilot | Strategy engine + daemon, Telegram push, `autopilot *`; market-sim; full anvil e2e §9.1 in CI; Sepolia acceptance run → `docs/acceptance.md` | §9.1 green on fork and Sepolia. (measured 0.1.2) **Passed** on both. Fork: items 1–8 in CI, `e2e/acceptance/acceptance.fork.test.ts` 16 passed / 0 skipped. Sepolia: 2026-10-20, commit `abbadf6`, 16/16 steps, 31 transactions; the relayer paid 0.256771 MNT, and the human and the agent held 0 MNT (`docs/acceptance.md`). Telegram was not exercised on Sepolia (no bot credentials); it is covered against a mock Bot API on the fork |
 | **0.1.3** — agent + demo | `SKILL.md`; `demo-up/down.sh`; docs (usage, demo script); TG demo §9.2 recorded | **Definition of Done** |
 | **0.1.4** — review + publish | Final independent security review (and fixes); npm publish `@0xwh1sker/mantle-meme-{sdk,cli}` | Review PASS; packages on npm. Does not block 0.1.3 |
 
