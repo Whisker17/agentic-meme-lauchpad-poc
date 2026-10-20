@@ -7,7 +7,9 @@ import {CurveRef, LaunchpadBase} from "../LaunchpadBase.sol";
 import {LaunchpadHandler} from "./LaunchpadHandler.sol";
 
 /// @notice Invariants C1–C6 of the design (§10) in a fixture without donations, where the
-///         solvency and supply equalities are exact.
+///         solvency and supply equalities are exact. The handler catches every protocol revert it
+///         predicts, so any revert reaching the fuzzer is a failure.
+/// forge-config: default.invariant.fail-on-revert = true
 contract MemeLaunchpadInvariantTest is LaunchpadBase {
     LaunchpadHandler internal handler;
 
@@ -32,6 +34,22 @@ contract MemeLaunchpadInvariantTest is LaunchpadBase {
         }
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
         targetContract(address(handler));
+    }
+
+    /// Runs once at the end of every run. A suite that passes with trading broken proves nothing:
+    /// a fresh curve must still take a full round trip and a completing buy, with no violation
+    /// and no unpredicted revert (the latter also covers every call of the run itself).
+    function afterInvariant() public {
+        (uint256 b, uint256 s, uint256 r, uint256 c) =
+            (handler.buys(), handler.sells(), handler.roundTrips(), handler.completions());
+        handler.probe();
+        assertEq(handler.buys(), b + 2, "probe: buys");
+        assertEq(handler.sells(), s + 2, "probe: sells");
+        assertEq(handler.roundTrips(), r + 1, "probe: round trip");
+        assertEq(handler.completions(), c + 1, "probe: completion");
+        assertEq(handler.vRevert(), 0, "unpredicted revert or success");
+        assertEq(handler.vQuote(), 0, "trade diverged from its quote");
+        assertEq(handler.vC2() + handler.vC3() + handler.vC5() + handler.vC6(), 0, "violation");
     }
 
     function _all() internal view returns (address[] memory) {
@@ -114,11 +132,13 @@ contract MemeLaunchpadInvariantTest is LaunchpadBase {
     function invariant_C6_truncation() public view {
         assertEq(handler.vC6(), 0, "completing buy diverged");
         assertEq(handler.vQuote(), 0, "trade diverged from its quote");
+        assertEq(handler.vRevert(), 0, "unpredicted revert or success");
     }
 }
 
 /// @notice The same invariants with quote and token donations to the launchpad: solvency and
 ///         supply then hold as strict inequalities (and exactly, net of the donations).
+/// forge-config: default.invariant.fail-on-revert = true
 contract MemeLaunchpadDonationInvariantTest is MemeLaunchpadInvariantTest {
     function donations() internal pure override returns (bool) {
         return true;
