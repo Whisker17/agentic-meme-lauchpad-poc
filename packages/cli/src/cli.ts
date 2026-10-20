@@ -60,12 +60,21 @@ import {
   parseUnits,
 } from "viem";
 import { getBlock, readContract } from "viem/actions";
+import {
+  autopilotStatus,
+  POLL_ENV,
+  readEvents,
+  runDaemon,
+  startAutopilot,
+  stopAutopilot,
+  TG_API_ENV,
+  TG_CHAT_ENV,
+  TG_TOKEN_ENV,
+  TICK_ENV,
+} from "./autopilot.js";
 import { CURVE_COMPLETED_TEXT, describe } from "./errors.js";
+import { QUOTE_DECIMALS, TOKEN_DECIMALS, toJson, tok, usd } from "./format.js";
 import { policyFile, SESSION_TTL_SECONDS } from "./policy.js";
-
-/** MockUSD and meme token decimals. */
-const QUOTE_DECIMALS = 6;
-const TOKEN_DECIMALS = 18;
 
 const USAGE = `usage: mantle-meme <command> [options]
 
@@ -80,15 +89,19 @@ const USAGE = `usage: mantle-meme <command> [options]
   watch        [--from-block <n>]                (JSON lines on stdout until interrupted)
   portfolio
   claim        <token> | --all
+  autopilot    start --strategy <file> | stop | status | log [--since <duration>]
 
   <token> is an address or a symbol. Amounts are human units (mUSD, tokens); --slippage is a
   percentage; durations are <n>s|m|h|d.
 
 options:  --json  --agent <name> (the agent profile; default: the only one)
 env:      ${RPC_URL_ENV}, ${SPONSOR_URL_ENV}, ${HOME_ENV}, ${PASSWORD_ENV}
+          autopilot: ${TG_TOKEN_ENV}, ${TG_CHAT_ENV} (Telegram push), ${TG_API_ENV},
+          ${TICK_ENV} (10000), ${POLL_ENV} (2000)
 exit:     0 ok, 10 policy, 11 limit, 12 inventory, 13 key expired/revoked,
           20 sponsor rejected, 21 sponsor busy, 30 reverted,
-          40 curve completed, 41 slippage, 42 unknown token, 43 insufficient balance, 1 other
+          40 curve completed, 41 slippage, 42 unknown token, 43 insufficient balance,
+          44 autopilot already running / not running, 1 other
 `;
 
 export interface CliIO {
@@ -157,13 +170,7 @@ function integer(value: string, flag: string, min: bigint, max?: bigint): bigint
 
 // ---- output -----------------------------------------------------------------------------------
 
-/** An amount in human and base units. */
-const usd = (base: bigint) => ({ human: formatUnits(base, QUOTE_DECIMALS), base });
-const tok = (base: bigint) => ({ human: formatUnits(base, TOKEN_DECIMALS), base });
 const orNull = <T>(value: bigint | null, f: (b: bigint) => T) => (value === null ? null : f(value));
-
-const toJson = (value: unknown, indent?: number) =>
-  JSON.stringify(value, (_, v) => (typeof v === "bigint" ? v.toString() : v), indent);
 
 /** The curve of a token for `list` / `info`; a completed curve carries the §4.5 notice. */
 function tokenView(t: TokenInfo) {
@@ -724,6 +731,32 @@ const COMMANDS: Record<string, Command> = {
   },
 };
 
+// The autopilot (DESIGN §7.3); `autopilot daemon` is the detached process `start` spawns.
+Object.assign(COMMANDS, {
+  "autopilot start": {
+    options: { strategy: S },
+    run: (ctx, v) => startAutopilot(ctx, resolve(required(v, "strategy")), str(v, "agent")),
+  },
+  "autopilot stop": { run: (ctx) => stopAutopilot(ctx.home) },
+  "autopilot status": { run: async (ctx) => autopilotStatus(ctx.home) },
+  "autopilot log": {
+    options: { since: S },
+    async run(ctx, v) {
+      const since = str(v, "since");
+      const after = since === undefined ? undefined : Date.now() - duration(since, "since") * 1000;
+      return { events: readEvents(ctx.home, after) };
+    },
+    text: (r: { events: unknown[] }) => r.events.map((e) => `${JSON.stringify(e)}\n`).join(""),
+  },
+  "autopilot daemon": {
+    options: { strategy: S },
+    async run(ctx, v) {
+      await runDaemon(ctx, required(v, "strategy"));
+      return PRINTED;
+    },
+  },
+} satisfies Record<string, Command>);
+
 // ---- entry point ------------------------------------------------------------------------------
 
 const GLOBAL = { json: B, help: { type: "boolean", short: "h" }, agent: S } as const;
@@ -739,7 +772,7 @@ export async function run(argv: string[], io: CliIO = {}): Promise<number> {
   const stdout = io.stdout ?? ((text: string) => void process.stdout.write(text));
   const stderr = io.stderr ?? ((text: string) => void process.stderr.write(text));
   const json = argv.includes("--json");
-  const words = argv[0] === "policy" ? 2 : 1;
+  const words = argv[0] === "policy" || argv[0] === "autopilot" ? 2 : 1;
   const name = argv.slice(0, words).join(" ");
   const spec = COMMANDS[name];
   const command = spec ? name : null;

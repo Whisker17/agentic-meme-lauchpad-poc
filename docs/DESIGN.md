@@ -451,6 +451,13 @@ iteration means a new launchpad version; tokens completed on v1 are not migrated
   through unchanged as the AA error (exit 30 for a revert). `toMemeError` also decodes the launchpad
   errors from a view's revert data (`packages/sdk/src/{errors,executor}.ts`).
 - **Strategy engine** (pure, unit-tested): `(strategy, events, positions, now) → actions`.
+  (measured 0.1.2) `decide({strategy, params, account, now, observed, positions, openPositions,
+  budget, budgetExhausted}) → Action[]` (`buy`, `skip` with a reason, `budget_exhausted`, `sell`
+  with `take_profit` / `max_hold`, `curve_completed`); `parseStrategy` validates the §7.3 file into
+  base units and basis points (`packages/sdk/src/strategy.ts`). It values a sale with the local
+  curve model (`simulateSell`), which the anvil suite checks against `quoteBuy` / `quoteSell` over
+  a fuzzed trade sequence (`packages/sdk/test/launchpad.anvil.test.ts`). The daemon itself lives in
+  the CLI (`packages/cli/src/autopilot.ts`), which owns the exit-code mapping it stops on (§7.3).
 
 ## 6. CLI (`mantle-meme`)
 
@@ -490,6 +497,13 @@ reference for every `--json` result:
   `{event, blockNumber, transactionHash, logIndex, args}`.
 - `policy init --expiry` accepts only `24h` (§6.2).
 - `autopilot *` is not shipped in 0.1.1 (0.1.2).
+
+(measured 0.1.2) `autopilot start --strategy <file> | stop | status | log [--since <duration>]`
+shipped as above; the `--json` results, the files and the events are in `packages/cli/README.md`.
+Besides the Telegram pair, the autopilot reads `MANTLE_MEME_TG_API_URL` (the Bot API base URL,
+default `https://api.telegram.org`), `MANTLE_MEME_AUTOPILOT_TICK_MS` (default 10000) and
+`MANTLE_MEME_AUTOPILOT_POLL_MS` (the watcher's poll, default 2000), so tests drive it against a
+mock Bot API without real-time waits.
 
 ### 6.2 policy init
 
@@ -540,7 +554,9 @@ Meme codes:
   including a reverted receipt the sponsor reported as a success, is exit 30
   `EXECUTION_REVERTED`. Before trading, `buy`, `sell` and `quote` check the curve (40) and resolve
   the token (42).
-- 44 is reserved until the autopilot ships (0.1.2).
+- 44 is reserved until the autopilot ships (0.1.2). (measured 0.1.2) 44 is `autopilot start` while
+  a daemon runs (its pid file names a live process) and `autopilot stop` while none runs; a
+  strategy that fails validation is exit 1 (`USAGE`).
 
 ## 7. Key flows
 
@@ -615,6 +631,41 @@ Events (`events.jsonl` and Telegram templates): `started`, `stopped`, `bought`, 
 (reason: take_profit / max_hold / stop_loss), `skipped` (reason), `budget_exhausted`,
 `curve_completed`, `session_ended`, `error`. Telegram push is sent only when the bot env vars are
 set; delivery failure never stops trading.
+
+(decision 2026-10-20) Every time is **chain time** (the latest block's timestamp): the observed
+age, the buy's `openedAt` (its block) and the max hold. On an anvil fork `evm_increaseTime` +
+`evm_mine` therefore moves the max hold without a real-time wait; `maxHoldMinutes` may also be
+fractional. The 10 s tick and the 2 s watcher poll are configurable (§6.1).
+
+(measured 0.1.2) As shipped (`packages/cli/src/autopilot.ts`, fork test
+`packages/cli/test/autopilot.fork.test.ts`):
+
+- `start` validates the strategy, refuses a running daemon (44) and spawns the detached daemon
+  (`mantle-meme autopilot daemon`, not for direct use). The daemon takes the `pid` file
+  exclusively (a racing second daemon is 44 too), checks the session, writes `strategy.json`,
+  `state.json` and `started`, and reports over IPC; `start` returns that report, or the daemon's
+  error with its exit code (e.g. 13 for a revoked key, 1 for a missing setting). `stop` is
+  SIGTERM: the daemon finishes its step, writes `stopped` and removes the pid file (SIGKILL after
+  60 s). The daemon also writes `daemon.log` (its stderr).
+- The watcher starts at the block after the current one, so a restart does not see a token twice.
+  Only positions the autopilot opened are managed (sold from the session's inventory of that
+  token); a restart manages the open positions of the previous run's `state.json` again.
+- Budget: the hook's `remainingLimit(keyHash, account, MockUSD)` and the account's MockUSD
+  `balanceOf`, read when new tokens are observed. A buy refused with 11 or 43 regardless is also
+  `budget_exhausted`. `budget_exhausted` stops entries until the next start.
+- A take-profit decided on the local model is re-checked with `quoteSell` and not sent when the
+  view no longer meets it; `minOut` is the view's output less `slippagePercent`.
+- Revoke: `mantle-aa session revoke` removes the key from Calibur and tombstones it on the hook.
+  The AA SDK then refuses at `simulate`, before anything is sent, with `PolicyViolationError`
+  "Session key is not registered on the account", which the AA CLI's `describeError` maps to
+  13. An idle daemon sends nothing, so every tick reads the key's state (Calibur `isRegistered`,
+  the expiry in `getKeySettings`, the hook's `getSummary().revoked`) and stops with
+  `session_ended` on the same errors `simulate` would raise. On the fork the idle daemon emitted
+  `session_ended`, `stopped` (`reason: session_ended`) and exited within one tick of the revoke.
+- Failures: a failed buy is an `error` event (the token is not retried); a failed sell is retried
+  by the next decision. A step that fails as a whole (e.g. an RPC answering behind the logs) keeps
+  its events for up to three more steps. Telegram is pushed in order in the background (10 s
+  timeout); a failure is an `error` event with `source: telegram`, the bot token scrubbed.
 
 ### 7.4 Revoke
 
