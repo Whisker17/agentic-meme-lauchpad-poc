@@ -152,7 +152,7 @@ async function main() {
   }
   const client = createPublicClient({
     chain: mantleSepolia,
-    transport: http(rpcUrl, { timeout: 30_000, retryCount: 5 }),
+    transport: http(rpcUrl, { timeout: 30_000, retryCount: 8 }),
   });
   assert.equal(await client.getChainId(), 5003, "Mantle Sepolia");
   const relayer = privateKeyToAccount(relayerKey).address;
@@ -190,8 +190,9 @@ async function main() {
     relayerKey,
     sim,
     dir,
-    tickMs: fork ? 300 : 2_000,
-    pollMs: fork ? 200 : 1_000,
+    // On Sepolia the daemon's defaults: the public RPC limits requests per IP.
+    tickMs: fork ? 300 : 10_000,
+    pollMs: fork ? 200 : 2_000,
     secrets: SECRETS,
     log,
   });

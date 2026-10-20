@@ -191,12 +191,8 @@ class RpcProxy {
         msgs = [JSON.parse(body)].flat();
       } catch {}
       await this.before?.(msgs);
-      const upstream = await fetch(`${this.target.replace(/\/$/, "")}${req.url ?? "/"}`, {
-        method: req.method ?? "POST",
-        headers: { "content-type": "application/json" },
-        ...(req.method === "GET" ? {} : { body }),
-      });
-      const reply = await upstream.text();
+      const upstream = await this.forward(req.method ?? "POST", req.url ?? "/", body);
+      const reply = upstream.text;
       if (msgs.length && (upstream.status !== 200 || reply.includes('"error"'))) {
         this.onError?.(
           msgs.map((m) => m.method ?? ""),
@@ -229,7 +225,32 @@ class RpcProxy {
     }
   });
 
+  /** Upstream answers of HTTP 429 (a public RPC's per-IP rate limit), each retried. */
+  throttled = 0;
+
   constructor(private readonly target: string) {}
+
+  /**
+   * One upstream request. A rate-limited answer (HTTP 429) or no answer is retried with backoff
+   * (≤ 8 times): the public RPC limits requests per IP, which is the infrastructure, not the product.
+   */
+  private async forward(method: string, path: string, body: string) {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const r = await fetch(`${this.target.replace(/\/$/, "")}${path}`, {
+          method,
+          headers: { "content-type": "application/json" },
+          ...(method === "GET" ? {} : { body }),
+        });
+        const text = await r.text();
+        if (r.status !== 429 || attempt === 8) return { status: r.status, text };
+        this.throttled++;
+      } catch (e) {
+        if (attempt >= 3) throw e;
+      }
+      await sleep(Math.min(250 * 2 ** attempt, 8_000));
+    }
+  }
 
   async listen() {
     await new Promise<void>((r) => this.server.listen(0, "127.0.0.1", r));
@@ -261,7 +282,7 @@ export class Acceptance {
   private readonly agentPassword = generatePrivateKey().slice(2, 26);
   readonly rootHome: string;
   readonly agentHome: string;
-  readonly client: PublicClient;
+  client!: PublicClient;
   sim!: MarketSim;
   /** Every transaction of the run, by hash, as the flow labelled it. */
   readonly labels = new Map<Hex, RunTx>();
@@ -275,6 +296,8 @@ export class Acceptance {
   private simRpc!: RpcProxy;
   private sponsorRpc!: RpcProxy;
   private agentRpc!: RpcProxy;
+  /** In front of the chain: the human's commands, the daemon, this flow's own reads. */
+  private chainRpc!: RpcProxy;
   /** In front of the sponsor: the human's and the agent's commands; the autopilot daemon. */
   private sponsorFront!: RpcProxy;
   private sponsorDaemon!: RpcProxy;
@@ -305,11 +328,6 @@ export class Acceptance {
     this.relayer = privateKeyToAccount(cfg.relayerKey).address;
     this.rootHome = join(cfg.dir, "root");
     this.agentHome = join(cfg.dir, "agent");
-    this.client = createPublicClient({
-      chain: mantleSepolia,
-      transport: http(cfg.rpcUrl, { timeout: 30_000, retryCount: 5 }),
-      pollingInterval: cfg.mode === "fork" ? 50 : 1_000,
-    });
   }
 
   get files() {
@@ -337,6 +355,12 @@ export class Acceptance {
     this.simRpc = await new RpcProxy(this.cfg.rpcUrl).listen();
     this.sponsorRpc = await new RpcProxy(this.cfg.rpcUrl).listen();
     this.agentRpc = await new RpcProxy(this.cfg.rpcUrl).listen();
+    this.chainRpc = await new RpcProxy(this.cfg.rpcUrl).listen();
+    this.client = createPublicClient({
+      chain: mantleSepolia,
+      transport: http(this.chainRpc.url, { timeout: 60_000, retryCount: 5 }),
+      pollingInterval: this.cfg.mode === "fork" ? 50 : 1_000,
+    });
     for (const p of [this.simRpc, this.sponsorRpc]) {
       p.onSent = (hash) => this.sentIn.set(hash, this.item);
     }
@@ -346,6 +370,7 @@ export class Acceptance {
       ["market-sim", this.simRpc],
       ["sponsor", this.sponsorRpc],
       ["agent", this.agentRpc],
+      ["chain", this.chainRpc],
     ] as const) {
       p.onError = (methods, detail) =>
         this.log(`${name} rpc: ${methods.join(",")} → ${this.scrub(detail)}`);
@@ -377,7 +402,7 @@ export class Acceptance {
     const common = { MANTLE_AA_SPONSOR_URL: this.sponsorFront.url };
     this.rootEnv = {
       ...common,
-      MANTLE_AA_RPC_URL: this.cfg.rpcUrl,
+      MANTLE_AA_RPC_URL: this.chainRpc.url,
       MANTLE_AA_HOME: this.rootHome,
       MANTLE_AA_KEYSTORE_PASSWORD: this.rootPassword,
     };
@@ -389,7 +414,7 @@ export class Acceptance {
     };
     this.daemonEnv = {
       ...this.agentEnv,
-      MANTLE_AA_RPC_URL: this.cfg.rpcUrl,
+      MANTLE_AA_RPC_URL: this.chainRpc.url,
       MANTLE_AA_SPONSOR_URL: this.sponsorDaemon.url,
       MANTLE_MEME_AUTOPILOT_TICK_MS: String(this.cfg.tickMs),
       MANTLE_MEME_AUTOPILOT_POLL_MS: String(this.cfg.pollMs),
@@ -473,15 +498,23 @@ export class Acceptance {
       await Promise.race([exited, sleep(10_000)]);
       if (sponsor.exitCode === null) sponsor.kill("SIGKILL");
     }
-    for (const p of [
-      this.simRpc,
-      this.sponsorRpc,
-      this.agentRpc,
-      this.sponsorFront,
-      this.sponsorDaemon,
-    ]) {
-      await p?.close();
+    const proxies = {
+      "market-sim": this.simRpc,
+      sponsor: this.sponsorRpc,
+      agent: this.agentRpc,
+      chain: this.chainRpc,
+      "sponsor (front)": this.sponsorFront,
+      "sponsor (daemon)": this.sponsorDaemon,
+    };
+    const throttled = Object.entries(proxies).filter(([, p]) => p?.throttled);
+    if (throttled.length) {
+      this.log(
+        `rate-limited upstream answers (HTTP 429) retried by the proxies: ${throttled
+          .map(([n, p]) => `${n} ${p?.throttled}`)
+          .join(", ")}`,
+      );
     }
+    for (const p of Object.values(proxies)) await p?.close();
   }
 
   /** `text` with every secret and the RPC URL replaced. */
