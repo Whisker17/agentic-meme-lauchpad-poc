@@ -17,7 +17,11 @@ The AA CLI's environment, nothing else:
 | `MANTLE_AA_RPC_URL` | every command except `policy init` |
 | `MANTLE_AA_SPONSOR_URL` | commands that send: `create`, `buy`, `sell`, `claim` |
 | `MANTLE_AA_HOME` | the agent home (`portfolio` and the commands that send); default `~/.mantle-aa`. For `policy init`, the root home |
-| `MANTLE_AA_KEYSTORE_PASSWORD` | the agent key's password (commands that send) |
+| `MANTLE_AA_KEYSTORE_PASSWORD` | the agent key's password (commands that send, `autopilot start`) |
+| `MANTLE_MEME_TG_BOT_TOKEN`, `MANTLE_MEME_TG_CHAT_ID` | the autopilot's Telegram push, only when both are set |
+| `MANTLE_MEME_TG_API_URL` | the Bot API base URL; default `https://api.telegram.org` |
+| `MANTLE_MEME_AUTOPILOT_TICK_MS` | the autopilot's exit / session check tick; default `10000` |
+| `MANTLE_MEME_AUTOPILOT_POLL_MS` | the autopilot watcher's `eth_getLogs` poll; default `2000` |
 
 `--agent <name>` picks the agent profile of the home (default: the only one). `--json` prints one
 JSON object on stdout (below). The deployed launchpad and MockUSD come from the shipped address
@@ -71,6 +75,10 @@ as a decimal string); every transaction is `hash` plus `explorer` (a Mantlescan 
 | `watch [--from-block <n>]` | one JSON line per launchpad event until SIGINT / SIGTERM: `{event, blockNumber, transactionHash, logIndex, args}` |
 | `portfolio` | `{agent, account, keyHash, expiry, session: {initialized, active, revoked}, quote: {token, balance, remainingLimit}, positions: [{token, symbol, status, balance, inventory, costBasis, sellValue, unrealisedPnl}]}` (`null` = unknown cost basis) |
 | `claim <token> \| --all` | `{account, claims: [{token, amount}], total, hash, explorer}`; nothing due: `hash` and `explorer` are `null` |
+| `autopilot start --strategy <file>` | `{pid, account, keyHash, fromBlock, strategy, files: {dir, pid, strategy, state, events, log}}` once the detached daemon runs; exit 44 when one already runs |
+| `autopilot stop` | `{pid, stopped: true, forced}` once the daemon exited (`forced`: killed after 60 s); exit 44 when none runs |
+| `autopilot status` | `{running, pid, strategy, state}` (`strategy` / `state`: the files below, `null` before the first start) |
+| `autopilot log [--since <duration>]` | `{events: [event]}`, oldest first; without `--json`, one JSON line per event |
 
 Token view: `{address, name, symbol, status, creator, createdAt, price: {human, priceE18}, sold,
 progressPercent, raised}`, plus `notice` on a completed curve.
@@ -82,6 +90,73 @@ progressPercent, raised}`, plus `notice` on a completed curve.
 - Successful trades are journalled in `<MANTLE_AA_HOME>/meme/journal.jsonl`, the only source of
   `portfolio`'s cost basis. Sends take the account's lock `<MANTLE_AA_HOME>/meme/send.lock` and
   retry a busy sponsor for up to 60 s.
+
+## Autopilot (DESIGN §7.3)
+
+`autopilot start` validates the strategy, then spawns a detached daemon that watches the
+launchpad, buys new tokens that pass the entry filters and sells by take-profit and max hold, all
+through the same send lock and journal as the commands. The strategy file:
+
+```json
+{
+  "entry": { "amountPerToken": "3", "maxAgeSeconds": 60, "keywords": [], "excludeOwn": true,
+             "maxOpenPositions": 10, "maxEntryPriceMultiple": 2 },
+  "exit":  { "takeProfitPercent": 50, "takeProfitSellPercent": 50,
+             "maxHoldMinutes": 30, "stopLossPercent": null },
+  "slippagePercent": 3
+}
+```
+
+- Required: `amountPerToken` (mUSD, a decimal string or number, > 0, at most 6 decimals),
+  `maxAgeSeconds` (> 0), `takeProfitPercent` (> 0), `takeProfitSellPercent` (0 < n ≤ 100),
+  `maxHoldMinutes` (> 0, fractional allowed). Defaults: `keywords` `[]` (every token),
+  `excludeOwn` `true`, `maxOpenPositions` 10 (integer ≥ 1), `maxEntryPriceMultiple` 2 (≥ 1),
+  `slippagePercent` 3 (0–100). `stopLossPercent` must be `null` or absent. Unknown fields are
+  refused. A bad strategy is exit 1 (`USAGE`).
+- Entry: a `TokenCreated` whose age when observed (chain time) is at most `maxAgeSeconds`, not
+  created by the account (`excludeOwn`), whose name or symbol contains a keyword
+  (case-insensitive), whose spot price is at most `maxEntryPriceMultiple` × the launch price,
+  while fewer than `maxOpenPositions` are open. Then the hook's `remainingLimit` and the account's
+  MockUSD balance must both cover `amountPerToken`; the first shortfall is `budget_exhausted` and
+  the daemon enters nothing more until restarted. The buy is re-quoted right before the send.
+- Exit: on every `Trade` of a held token and on every tick, the net sell value of
+  `takeProfitSellPercent` of the session's inventory (local curve model, re-checked with
+  `quoteSell` before the send) against that portion's journal cost basis: at
+  `+takeProfitPercent` it sells that portion, once per position. `maxHoldMinutes` after the buy
+  (chain time) it sells the whole remaining inventory. A position whose cost basis is unknown is
+  not managed (`skipped`, `unknown_cost_basis`); a completed curve is `curve_completed`.
+- Times are chain time (the latest block's timestamp), so on a fork `evm_increaseTime` +
+  `evm_mine` moves the max hold.
+- Every tick reads the key's state on chain (Calibur `isRegistered`, its expiry, the hook's
+  `revoked`), so an idle daemon notices a revoke; that, or any exit 13 of a send, emits
+  `session_ended` and the daemon exits.
+- The daemon watches the blocks after the one current at the start. Only positions the autopilot
+  opened are managed; a restart manages the open ones of the previous run again.
+
+Files in `<MANTLE_AA_HOME>/meme/autopilot/`: `pid` (the running daemon), `strategy.json` (as
+given), `state.json` (`{status: running|stopped|session_ended, pid, startedAt, updatedAt,
+account, keyHash, fromBlock, budgetExhausted, positions: [{token, symbol, openedAt, status:
+open|closed|completed|unmanaged, takeProfitDone}]}`), `events.jsonl` and `daemon.log` (the
+daemon's own stderr).
+
+Events (`events.jsonl`, one JSON object per line, `at` = ISO wall-clock time):
+
+| `event` | Fields |
+| --- | --- |
+| `started` | `pid, account, keyHash, fromBlock, strategy` |
+| `stopped` | `reason`: `stop`, `session_ended`, `error`, `killed` |
+| `bought` | `token, symbol, hash, explorer, ageSeconds, spent, tokens, fee, minOut` |
+| `sold` | `token, symbol, reason` (`take_profit`, `max_hold`)`, hash, explorer, sold, received, fee, minOut, costBasis, pnl` |
+| `skipped` | `token, symbol, reason`: `too_old`, `own`, `keywords`, `not_trading`, `entry_price`, `max_positions`, `unknown_cost_basis` |
+| `budget_exhausted` | `needed, remainingLimit, balance` (or `needed, cause` when a send was refused with 11 / 43) |
+| `curve_completed` | `token, symbol` |
+| `session_ended` | `exitCode` 13 and the error's `code, type, message, …` |
+| `error` | `source` (`buy`, `sell`, `step`, `watch`, `telegram`, `daemon`), `exitCode`, `code, type, message, …`; a failed sell is retried by the next decision, a failed buy is not |
+
+With `MANTLE_MEME_TG_BOT_TOKEN` and `MANTLE_MEME_TG_CHAT_ID` set, every event except the entry
+filter skips and Telegram's own errors is pushed as a template message (Bot API `sendMessage`).
+A failed push is an `error` event (`source: telegram`) and never stops trading; the token is never
+written to a file or an output.
 
 ## Output and exit codes
 
@@ -104,7 +179,7 @@ progressPercent, raised}`, plus `notice` on a completed curve.
 | 41 | `SLIPPAGE` | Output below `minOut` |
 | 42 | `UNKNOWN_TOKEN` | Not registered on this launchpad, or a missing or ambiguous symbol (`candidates`, at most 10) |
 | 43 | `INSUFFICIENT_BALANCE` | The account's MockUSD (or token) balance is too low (`balance`, `needed`) |
-| 44 | `AUTOPILOT_STATE` | Reserved for `autopilot` |
+| 44 | `AUTOPILOT_STATE` | `autopilot start` while a daemon runs, `autopilot stop` while none runs |
 
 AA codes come unchanged from the published `mantle-aa` CLI's `describeError`. `buy`, `sell` and
 `quote` check the curve before trading (40). The deployed Calibur reverts a failing session call
@@ -118,6 +193,8 @@ pnpm build                                              # dist/bin/mantle-meme.j
 pnpm vitest run packages/cli/test/cli.test.ts           # no chain
 MANTLE_SEPOLIA_RPC_URL=https://rpc.sepolia.mantle.xyz \
   pnpm vitest run packages/cli/test/cli.fork.test.ts    # anvil fork, real AA contracts, sponsor
+MANTLE_SEPOLIA_RPC_URL=https://rpc.sepolia.mantle.xyz \
+  pnpm vitest run packages/cli/test/autopilot.fork.test.ts   # the daemon on the fork
 ```
 
 `test/helpers.ts` runs the binary from its TypeScript sources (no build) and the published
