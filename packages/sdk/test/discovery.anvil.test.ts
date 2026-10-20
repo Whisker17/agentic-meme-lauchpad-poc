@@ -1,14 +1,17 @@
-// Discovery, symbol resolution and the revert mapping against the launchpad deployed on plain anvil
-// from a fresh forge build.
+// Discovery, symbol resolution, the revert mapping and the failure diagnosis against the launchpad
+// deployed on plain anvil from a fresh forge build.
+import { type Call, ExecutionRevertedError } from "@0xwh1sker/mantle-aa-sdk";
 import {
   type Abi,
   type Address,
+  encodeErrorResult,
   encodeFunctionData,
   type Hex,
   maxUint256,
   parseEventLogs,
   zeroAddress,
 } from "viem";
+import { privateKeyToAddress } from "viem/accounts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   buyCall,
@@ -16,9 +19,12 @@ import {
   createTokenCall,
   curveState,
   DESIGN_CURVE_PARAMS,
+  diagnoseFailure,
+  InsufficientBalanceError,
   type LaunchpadEvent,
   listTokens,
   memeLaunchpadAbi,
+  predictTokenAddress,
   quoteBuy,
   randomSalt,
   resolveToken,
@@ -212,5 +218,61 @@ describe("discovery on anvil", { timeout: 60_000 }, () => {
     expect(completed).toBeInstanceOf(CurveCompletedError);
     const unknown = await quoteBuy(user, launchpad, usd, mUSD(1)).catch(toMemeError);
     expect(unknown).toBeInstanceOf(UnknownTokenError);
+  });
+});
+
+describe("diagnoseFailure on anvil", { timeout: 60_000 }, () => {
+  /** An account holding no MockUSD and no tokens. */
+  const poor = privateKeyToAddress(keys[1]);
+  const opaque = () => new ExecutionRevertedError({ data: "0x3204506f" });
+  const order = { minOut: 0n, deadline: maxUint256, recipient: poor };
+  const buy = (token: Address, amount: bigint, minOut = 0n) =>
+    buyCall(launchpad, { ...order, token, amount, minOut });
+  const diagnose = (calls: Call[], error = opaque()) =>
+    diagnoseFailure(user, launchpad, poor, calls, error);
+
+  it("an opaque failure on a completed curve is CurveCompletedError, though the balance is short too", async () => {
+    const done = await createToken("Done", "DONE");
+    await trade("buy", done, mUSD(1000));
+    expect(await diagnose([buy(done, mUSD(1))])).toBeInstanceOf(CurveCompletedError);
+    expect(
+      await diagnose([sellCall(launchpad, { ...order, token: done, amount: 1n })]),
+    ).toBeInstanceOf(CurveCompletedError);
+  });
+
+  it("an opaque failure on an unknown token is UnknownTokenError, though the balance is short too; a token the batch creates is checked for balance", async () => {
+    expect(await diagnose([buy(usd, mUSD(1))])).toBeInstanceOf(UnknownTokenError);
+    // A buy of the token the same batch creates has no quote yet: balance only.
+    const salt = randomSalt();
+    const predicted = predictTokenAddress(launchpad, poor, salt, "New", "NEW");
+    const create = createTokenCall(launchpad, { name: "New", symbol: "NEW", salt });
+    expect(await diagnose([create, buy(predicted, mUSD(1))])).toBeInstanceOf(
+      InsufficientBalanceError,
+    );
+  });
+
+  it("explicit revert data is kept; only an opaque failure is diagnosed from the balance", async () => {
+    const [, pepe] = created[0] as [string, Address];
+    const expired = new ExecutionRevertedError({
+      data: encodeErrorResult({ abi: memeLaunchpadAbi, errorName: "Expired" }),
+    });
+    expect(await diagnose([buy(pepe, mUSD(1))], expired)).toBe(expired);
+    expect(await diagnose([buy(pepe, mUSD(1))])).toBeInstanceOf(InsufficientBalanceError);
+  });
+
+  it("a buy that completes the curve needs only the quote's amountInUsed", async () => {
+    const near = await createToken("Near", "NEAR");
+    await trade("buy", near, mUSD(550));
+    const q = await quoteBuy(user, launchpad, near, mUSD(100));
+    expect(q.completes).toBe(true);
+    const fund = (amount: bigint) =>
+      send({ to: usd, data: encode(artifact("MockUSD").abi, "transfer", [poor, amount]) });
+    await fund(q.amountInUsed - 1n);
+    const short = await diagnose([buy(near, mUSD(100), q.amountOut)]);
+    expect(short).toBeInstanceOf(InsufficientBalanceError);
+    expect(short).toMatchObject({ balance: q.amountInUsed - 1n, needed: q.amountInUsed });
+    await fund(1n);
+    const error = opaque();
+    expect(await diagnose([buy(near, mUSD(100), q.amountOut)], error)).toBe(error);
   });
 });

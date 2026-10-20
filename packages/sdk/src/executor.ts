@@ -130,14 +130,18 @@ async function receiptOf(client: Client, hash: Hex, timeoutMs: number) {
   }
 }
 
+/** Calibur's bare `CallFailed()`: the failed call's revert data is lost. */
+const BARE_CALL_FAILED = "0x3204506f";
+
 /**
  * Explains a failed batch in meme terms. Calibur reports a failed call as a bare `CallFailed()`
  * (the launchpad's revert data is not bubbled), and a batch that reverts on chain carries no data
- * at all, so each launchpad `buy` / `sell` of the batch is checked against the chain now: the quote
- * view's revert (`UnknownTokenError`, `CurveCompletedError`), the account's balance
+ * at all, so for such an opaque failure each launchpad `buy` / `sell` of the batch is checked
+ * against the chain now, in the contract's order: the quote view's revert (`UnknownTokenError`,
+ * `CurveCompletedError`), the account's balance against the quote's actual input
  * (`InsufficientBalanceError`), then the quoted output against `minOut` (`SlippageError`). A buy
- * of a token the same batch creates is checked for balance only. Anything else is returned as
- * `toMemeError(error)`.
+ * of a token the same batch creates is checked for balance only. Revert data that names another
+ * error is kept: anything else is returned as `toMemeError(error)`.
  */
 export async function diagnoseFailure(
   client: Client,
@@ -148,6 +152,8 @@ export async function diagnoseFailure(
 ): Promise<unknown> {
   const mapped = toMemeError(error);
   if (mapped !== error || !(error instanceof ExecutionRevertedError)) return mapped;
+  const data = error.data?.toLowerCase();
+  if (data && data !== "0x" && data !== BARE_CALL_FAILED) return error;
   const decoded = calls
     .filter((c) => isAddressEqual(c.to, launchpad))
     .flatMap((c) => {
@@ -163,6 +169,18 @@ export async function diagnoseFailure(
     const [token, amount, minOut] = f.args;
     const isBuy = f.functionName === "buy";
     const found = await (async (): Promise<Error | undefined> => {
+      // The quote view reverts as the trade would (unknown token, completed curve); a buy pulls
+      // only the quote's `amountInUsed`. A token the batch creates has no quote yet.
+      let out: bigint | undefined;
+      let needed = amount;
+      if (!(isBuy && creates)) {
+        const quote = { address: launchpad, abi: memeLaunchpadAbi, args: [token, amount] } as const;
+        if (isBuy) {
+          [out, needed] = await readContract(client, { ...quote, functionName: "quoteBuy" });
+        } else {
+          [out] = await readContract(client, { ...quote, functionName: "quoteSell" });
+        }
+      }
       const asset = isBuy
         ? await readContract(client, {
             address: launchpad,
@@ -176,13 +194,10 @@ export async function diagnoseFailure(
         functionName: "balanceOf",
         args: [account],
       });
-      if (balance < amount) return new InsufficientBalanceError({ balance, needed: amount });
-      if (isBuy && creates) return undefined;
-      const quote = { address: launchpad, abi: memeLaunchpadAbi, args: [token, amount] } as const;
-      const [out] = isBuy
-        ? await readContract(client, { ...quote, functionName: "quoteBuy" })
-        : await readContract(client, { ...quote, functionName: "quoteSell" });
-      return out < minOut ? new SlippageError(`Output ${out} below minOut ${minOut}`) : undefined;
+      if (balance < needed) return new InsufficientBalanceError({ balance, needed });
+      return out !== undefined && out < minOut
+        ? new SlippageError(`Output ${out} below minOut ${minOut}`)
+        : undefined;
     })().catch((e: unknown) => {
       const m = toMemeError(e);
       return m !== e ? (m as Error) : undefined;
@@ -195,8 +210,9 @@ export async function diagnoseFailure(
 /**
  * Sends a batch for the session (DESIGN §7.1): takes the account's send lock, then
  * `AgentSession.exec` (simulate, then submit through the executor), retrying `SPONSOR_BUSY`; reads
- * the receipt and appends the transaction's own `Trade` logs to the journal. Launchpad reverts
- * become meme errors (`toMemeError`); AA SDK errors pass through.
+ * the receipt and appends the transaction's own `Trade` logs to the journal. A reverted receipt is
+ * an `ExecutionRevertedError` naming the hash, whatever the executor reported; nothing is
+ * journalled. A failure is explained by `diagnoseFailure`; AA SDK errors pass through.
  */
 export async function execute(o: ExecuteOptions): Promise<ExecuteResult> {
   try {
@@ -208,6 +224,10 @@ export async function execute(o: ExecuteOptions): Promise<ExecuteResult> {
           o.busyMaxMs,
         );
         const receipt = await receiptOf(o.client, hash, o.receiptTimeoutMs ?? 60_000);
+        // The executor's `success` is the sponsor's word; the receipt is the chain's.
+        if (receipt.status !== "success") {
+          throw new ExecutionRevertedError({ reason: `Transaction ${hash} reverted` });
+        }
         const trades = tradesOf(receipt, o.launchpad, o.session.account, o.session.keyHash);
         appendJournal(o.home, trades);
         return { hash, receipt, trades };
