@@ -9,11 +9,11 @@ importers:
   .:
     devDependencies:
       '@0xwh1sker/mantle-aa-sdk':
-        specifier: ~0.1.4
-        version: 0.1.4(viem@2.57.7(typescript@7.0.2))
+        specifier: ~0.1.5
+        version: 0.1.5(viem@2.57.7(typescript@7.0.2))
       '@0xwh1sker/mantle-aa-sponsor':
-        specifier: ~0.1.4
-        version: 0.1.4(typescript@7.0.2)
+        specifier: ~0.1.5
+        version: 0.1.5(typescript@7.0.2)
       '@biomejs/biome':
         specifier: ^2.5.15
         version: 2.5.15
@@ -32,15 +32,18 @@ importers:
 
   packages/cli:
     dependencies:
+      '@0xwh1sker/mantle-aa-cli':
+        specifier: ~0.1.5
+        version: 0.1.5(typescript@7.0.2)
       '@0xwh1sker/mantle-aa-sdk':
-        specifier: ~0.1.4
-        version: 0.1.4(viem@2.57.7(typescript@7.0.2))
+        specifier: ~0.1.5
+        version: 0.1.5(viem@2.57.7(typescript@7.0.2))
       '@0xwh1sker/mantle-meme-sdk':
         specifier: workspace:*
         version: link:../sdk
-      commander:
-        specifier: ^14.0.3
-        version: 14.0.3
+      viem:
+        specifier: 2.57.7
+        version: 2.57.7(typescript@7.0.2)
     devDependencies:
       typescript:
         specifier: ^7.0.2
@@ -49,8 +52,8 @@ importers:
   packages/sdk:
     dependencies:
       '@0xwh1sker/mantle-aa-sdk':
-        specifier: ~0.1.4
-        version: 0.1.4(viem@2.57.7(typescript@7.0.2))
+        specifier: ~0.1.5
+        version: 0.1.5(viem@2.57.7(typescript@7.0.2))
       viem:
         specifier: 2.57.7
         version: 2.57.7(typescript@7.0.2)
@@ -61,14 +64,19 @@ importers:
 
 packages:
 
-  '@0xwh1sker/mantle-aa-sdk@0.1.4':
-    resolution: {integrity: sha512-t5/aCrNGCFm4EUeuE7+sG39flOh0fYIiNoMLO/Fvwhfc+c901MJ5kUYgzPqQGrtFEiG/gQZjxp/GlboSZgwViA==}
+  '@0xwh1sker/mantle-aa-cli@0.1.5':
+    resolution: {integrity: sha512-0URy/xnpf13lHXOvkwzOUxkTfNk+EfhYyF6Kuwu71X0so26skvRib1t9fVtkNRTBu5hs0T+1gFjCmel5eKLhvQ==}
+    engines: {node: '>=24'}
+    hasBin: true
+
+  '@0xwh1sker/mantle-aa-sdk@0.1.5':
+    resolution: {integrity: sha512-S9ey53G/6SmV1F56xi97mxccvAut1kDOZnn08l4f/33P2YcGKXhckT/aiZas7HTTtU8iS3dMgkU4OtQle5+0pg==}
     engines: {node: '>=24'}
     peerDependencies:
       viem: ^2.43.4
 
-  '@0xwh1sker/mantle-aa-sponsor@0.1.4':
-    resolution: {integrity: sha512-5gKemnAXbSwUvMRmXnvqZTAwprEnxtSCcuU2VCeKF0Q/GPFx0UPoYzoSXml6IoDrAryae2VgdK4MZx6fj7T6rA==}
+  '@0xwh1sker/mantle-aa-sponsor@0.1.5':
+    resolution: {integrity: sha512-JZVkBfGqtxABjki/L35VBcOy/Xz2svnWSQ6ni7JXzbTaxs/P1mW5nNbLe3cSzvT2K0s0Aa+mwiIWwL0uNSL3Bg==}
     engines: {node: '>=24'}
 
   '@adraffy/ens-normalize@1.11.1':
@@ -429,10 +437,6 @@ packages:
     resolution: {integrity: sha512-XWAtwJ6OHO+tj0EKCs0Y2UamnyOxseZWltU4x2U2wh8g4AigdjwvtUjvLP2tqkA/avxHEtzxNaqGq/YGNwckKg==}
     engines: {node: '>=18'}
 
-  commander@14.0.3:
-    resolution: {integrity: sha512-H+y0Jo/T1RZ9qPP4Eh1pkcQcLRglraJaSLoyOtHxu6AapkjWVCy2Sit1QQ4x3Dng8qDlSsZEet7g5Pq06MvTgw==}
-    engines: {node: '>=20'}
-
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
@@ -722,13 +726,24 @@ packages:
 
 snapshots:
 
-  '@0xwh1sker/mantle-aa-sdk@0.1.4(viem@2.57.7(typescript@7.0.2))':
+  '@0xwh1sker/mantle-aa-cli@0.1.5(typescript@7.0.2)':
+    dependencies:
+      '@0xwh1sker/mantle-aa-sdk': 0.1.5(viem@2.57.7(typescript@7.0.2))
+      '@0xwh1sker/mantle-aa-sponsor': 0.1.5(typescript@7.0.2)
+      viem: 2.57.7(typescript@7.0.2)
+    transitivePeerDependencies:
+      - bufferutil
+      - typescript
+      - utf-8-validate
+      - zod
+
+  '@0xwh1sker/mantle-aa-sdk@0.1.5(viem@2.57.7(typescript@7.0.2))':
     dependencies:
       viem: 2.57.7(typescript@7.0.2)
 
-  '@0xwh1sker/mantle-aa-sponsor@0.1.4(typescript@7.0.2)':
+  '@0xwh1sker/mantle-aa-sponsor@0.1.5(typescript@7.0.2)':
     dependencies:
-      '@0xwh1sker/mantle-aa-sdk': 0.1.4(viem@2.57.7(typescript@7.0.2))
+      '@0xwh1sker/mantle-aa-sdk': 0.1.5(viem@2.57.7(typescript@7.0.2))
       viem: 2.57.7(typescript@7.0.2)
       yaml: 2.9.1
     transitivePeerDependencies:
@@ -944,8 +959,6 @@ snapshots:
   assertion-error@2.0.1: {}
 
   chai@6.3.0: {}
-
-  commander@14.0.3: {}
 
   detect-libc@2.1.2: {}
 

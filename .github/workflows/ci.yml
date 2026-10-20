@@ -61,10 +61,9 @@ jobs:
       - name: Test
         run: |
           if [ "$SUITE" = e2e ]; then
-            if [ -z "$(git ls-files 'e2e/**/*.test.ts')" ]; then
-              echo "No e2e test files in this tree yet; skipping."
-              echo '{"testResults":[]}' > "$RUNNER_TEMP/vitest.json"
-              exit 0
+            if [ -z "$(git ls-files ':(glob)e2e/**/*.test.ts')" ]; then
+              echo "::error::No e2e test files (e2e/**/*.test.ts) in this tree; the e2e suite is missing."
+              exit 1
             fi
             scope=(e2e/)
           else
@@ -100,7 +99,12 @@ jobs:
               failed = true;
             }
           }
-          if (files.length === 0) console.log(`No fork suites for the ${process.env.SUITE} job in this tree.`);
+          if (files.length === 0 && process.env.SUITE === "e2e") {
+            console.log("::error::No e2e fork suites found; the e2e suite is missing.");
+            failed = true;
+          } else if (files.length === 0) {
+            console.log(`No fork suites for the ${process.env.SUITE} job in this tree.`);
+          }
           process.exit(failed ? 1 : 0);
           EOF
 
@@ -119,26 +123,24 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Detect Foundry project
-        id: detect
+      - name: Require Foundry project
         run: |
-          if [ -f contracts/foundry.toml ]; then echo "present=true" >> "$GITHUB_OUTPUT"; else echo "present=false" >> "$GITHUB_OUTPUT"; fi
+          if [ ! -f contracts/foundry.toml ]; then
+            echo "::error file=contracts/foundry.toml::Foundry project missing: contracts/foundry.toml not found."
+            exit 1
+          fi
 
       - uses: foundry-rs/foundry-toolchain@v1
-        if: steps.detect.outputs.present == 'true'
 
       - name: Format
-        if: steps.detect.outputs.present == 'true'
         working-directory: contracts
         run: forge fmt --check
 
       - name: Build
-        if: steps.detect.outputs.present == 'true'
         working-directory: contracts
         run: forge build --sizes
 
       - name: Test
-        if: steps.detect.outputs.present == 'true'
         working-directory: contracts
         env:
           MANTLE_SEPOLIA_RPC_URL: https://rpc.sepolia.mantle.xyz
@@ -147,7 +149,6 @@ jobs:
           forge test -vvv --no-match-path 'test/invariant/**' 2>&1 | tee "$RUNNER_TEMP/forge-test.log"
 
       - name: Fork tests ran
-        if: steps.detect.outputs.present == 'true'
         working-directory: contracts
         run: |
           files=$(git ls-files '*.fork.t.sol')
@@ -175,12 +176,11 @@ jobs:
           exit "$failed"
 
       - name: Invariants (fixed seeds)
-        if: steps.detect.outputs.present == 'true'
         working-directory: contracts
         run: |
           if [ ! -d test/invariant ]; then
-            echo "No contracts/test/invariant/ yet; skipping the fixed-seed invariant runs."
-            exit 0
+            echo "::error::Invariant suite missing: contracts/test/invariant/ not found."
+            exit 1
           fi
           set -o pipefail
           log="$RUNNER_TEMP/invariants.log"
