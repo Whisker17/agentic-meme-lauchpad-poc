@@ -71,7 +71,7 @@ import {
 } from "viem";
 import { generatePrivateKey, mnemonicToAccount } from "viem/accounts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { forgeBuild } from "../packages/sdk/test/helpers.js";
+import { forgeBuild } from "../../packages/sdk/test/helpers.js";
 import { startFork } from "./fork.js";
 
 const rpcUrl = process.env.MANTLE_SEPOLIA_RPC_URL;
