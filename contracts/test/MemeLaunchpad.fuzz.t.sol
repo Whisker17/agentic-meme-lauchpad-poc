@@ -51,6 +51,7 @@ contract MemeLaunchpadFuzzTest is LaunchpadBase {
         assertEq(lp.creatorFees(token) + lp.protocolFees() - fees0, rFee);
         assertEq(s1.status == MemeLaunchpad.Status.Completed, rCompletes);
         assertGe(s1.virtualQuote * s1.virtualToken, K);
+        assertGt(s1.priceE18, s0.priceE18, "buy raises the price");
     }
 
     function testFuzz_sell_matchesReferenceQuoteAndBalances(
@@ -82,6 +83,7 @@ contract MemeLaunchpadFuzzTest is LaunchpadBase {
         assertEq(s0.virtualQuote - s1.virtualQuote, rOut + rFee);
         assertEq(lp.creatorFees(token) + lp.protocolFees() - fees0, rFee);
         assertGe(s1.virtualQuote * s1.virtualToken, K);
+        assertLt(s1.priceE18, s0.priceE18, "sell lowers the price");
     }
 
     /// The completing buy: `amountInUsed <= amountIn`, minimal, books exactly `netNeeded`, and
