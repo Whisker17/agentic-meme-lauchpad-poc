@@ -177,6 +177,8 @@ class RpcProxy {
   readonly sent: Hex[] = [];
   /** Called with the hash of every transaction relayed. */
   onSent: ((hash: Hex) => void) | undefined;
+  /** Called with every failed exchange: an HTTP error, a JSON-RPC error, or no answer at all. */
+  onError: ((methods: string[], detail: string) => void) | undefined;
   before: ((msgs: Message[]) => Promise<void>) | undefined;
   after: ((msgs: Message[]) => Promise<void>) | undefined;
   private readonly server = createServer(async (req, res) => {
@@ -195,6 +197,12 @@ class RpcProxy {
         ...(req.method === "GET" ? {} : { body }),
       });
       const reply = await upstream.text();
+      if (msgs.length && (upstream.status !== 200 || reply.includes('"error"'))) {
+        this.onError?.(
+          msgs.map((m) => m.method ?? ""),
+          `HTTP ${upstream.status} ${reply.slice(0, 300)}`,
+        );
+      }
       await this.after?.(msgs);
       if (msgs.length) {
         this.exchanges.push({
@@ -215,7 +223,8 @@ class RpcProxy {
         } catch {}
       }
       res.writeHead(upstream.status, { "content-type": "application/json" }).end(reply);
-    } catch {
+    } catch (e) {
+      this.onError?.([], `no answer: ${(e as Error).message}`);
       if (!res.headersSent) res.writeHead(502).end();
     }
   });
@@ -327,8 +336,14 @@ export class Acceptance {
   async start() {
     this.simRpc = await new RpcProxy(this.cfg.rpcUrl).listen();
     this.sponsorRpc = await new RpcProxy(this.cfg.rpcUrl).listen();
-    for (const p of [this.simRpc, this.sponsorRpc]) {
+    for (const [name, p] of [
+      ["market-sim", this.simRpc],
+      ["sponsor", this.sponsorRpc],
+    ] as const) {
       p.onSent = (hash) => this.sentIn.set(hash, this.item);
+      // Evidence for a failure the sponsor or market-sim reports without its cause.
+      p.onError = (methods, detail) =>
+        this.log(`${name} rpc: ${methods.join(",")} → ${this.scrub(detail)}`);
     }
     this.agentRpc = await new RpcProxy(this.cfg.rpcUrl).listen();
     this.sim = new MarketSim({
