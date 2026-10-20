@@ -1040,7 +1040,7 @@ export class Acceptance {
       if (fired || !isQuoteBuy(msgs)) return;
       fired++;
       const quotedAt = Date.now();
-      const hash = await this.client.sendRawTransaction({ serializedTransaction: raw });
+      const hash = await wallet.sendRawTransaction({ serializedTransaction: raw });
       this.label(
         hash,
         "6",
