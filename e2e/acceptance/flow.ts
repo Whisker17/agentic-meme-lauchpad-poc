@@ -1302,10 +1302,14 @@ export class Acceptance {
   /** Remaining limit strictly between amountInUsed and the requested amount on a completing buy. */
   async clamp() {
     const symbol = `CLMP${this.tag}`;
-    const { token } = await this.sim.createToken({ wallet: 0, name: `Clamp ${this.tag}`, symbol });
+    const created = await this.sim.createToken({ wallet: 0, name: `Clamp ${this.tag}`, symbol });
+    const token = created.token;
+    await this.receipt(created.tx);
     const full = await quoteBuy(this.client, PAD, token, mUSD(1_000));
     // A market buy leaves about 1.5 mUSD to completion.
-    await this.sim.buy(token, full.amountInUsed - mUSD(1.5), { wallet: 1 });
+    await this.receipt(
+      (await this.sim.buy(token, full.amountInUsed - mUSD(1.5), { wallet: 1 })).tx,
+    );
     const limit = await this.hookRead("remainingLimit", USD);
     const requested = limit + mUSD(1);
     const q = await quoteBuy(this.client, PAD, token, requested);
