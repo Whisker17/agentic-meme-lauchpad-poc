@@ -18,6 +18,7 @@ import { UsageError } from "@0xwh1sker/mantle-aa-cli";
 import {
   type AgentSession,
   agentPolicyHookAbi,
+  type Call,
   caliburAbi,
   KeyExpiredError,
   PolicyViolationError,
@@ -62,6 +63,11 @@ export const TG_API_ENV = "MANTLE_MEME_TG_API_URL";
 export const TICK_ENV = "MANTLE_MEME_AUTOPILOT_TICK_MS";
 /** The watcher's `eth_getLogs` poll in ms; default 2 000. */
 export const POLL_ENV = "MANTLE_MEME_AUTOPILOT_POLL_MS";
+/**
+ * Tests only: the daemon SIGKILLs itself right after a trade of this kind (`buy`, `take_profit`,
+ * `max_hold`) confirmed, before anything else records it, as a crash would. Unset in use.
+ */
+export const CRASH_ENV = "MANTLE_MEME_AUTOPILOT_TEST_CRASH_AFTER";
 
 const KEY_EXPIRED_OR_REVOKED = 13;
 
@@ -343,10 +349,25 @@ type PositionStatus = "open" | "closed" | "completed" | "unmanaged";
 interface PositionState {
   token: Address;
   symbol: string;
-  /** Chain time of the buy's block (unix seconds). */
-  openedAt: number;
+  /** The buy's block. */
+  openedBlock: number;
+  /** Chain time of the buy's block (unix seconds); `null` until that block was read. */
+  openedAt: number | null;
   status: PositionStatus;
   takeProfitDone: boolean;
+}
+
+/**
+ * The autopilot trade being sent, checkpointed before the send. A trade that confirms is applied
+ * to the positions at once; when the daemon died first, the next start applies it from the journal
+ * (the only accounting source, D33): the session's trade of that token and side appended after
+ * `journalLength` records.
+ */
+interface PendingTrade {
+  token: Address;
+  symbol: string;
+  reason: "buy" | "take_profit" | "max_hold";
+  journalLength: number;
 }
 
 interface DaemonState {
@@ -359,6 +380,7 @@ interface DaemonState {
   fromBlock: bigint;
   budgetExhausted: boolean;
   positions: PositionState[];
+  pending: PendingTrade | null;
 }
 
 /** Thrown by a step when the session key expired or was revoked (exit 13). */
@@ -485,6 +507,7 @@ async function daemon(
     if (ended) throw ended;
 
     const previous = readJson(f.state) as DaemonState | null;
+    if (previous?.pending) recover(previous, previous.pending, ctx.home, session.keyHash);
     const now = new Date().toISOString();
     state = {
       status: "running",
@@ -496,6 +519,7 @@ async function daemon(
       fromBlock,
       budgetExhausted: false,
       positions: (previous?.positions ?? []).filter((p) => p.status === "open"),
+      pending: null,
     };
     writeFileSync(f.strategy, `${JSON.stringify(raw, null, 2)}\n`, { mode: 0o600 });
     writeJson(f.state, state);
@@ -542,7 +566,7 @@ async function daemon(
   }
 }
 
-interface Run {
+export interface Run {
   ctx: AutopilotContext;
   strategy: Strategy;
   params: CurveParams;
@@ -554,7 +578,7 @@ interface Run {
   state: DaemonState;
 }
 
-interface LoopOptions {
+export interface LoopOptions {
   tickMs: number;
   pollMs: number;
   signal: AbortSignal;
@@ -626,13 +650,80 @@ async function loop(run: Run, o: LoopOptions): Promise<void> {
         queue.unshift(...again);
         for (const x of events) if (!again.includes(x)) retries.delete(keyOf(x));
       } finally {
-        run.state.updatedAt = new Date().toISOString();
-        writeJson(autopilotFiles(run.ctx.home).state, run.state);
+        save(run);
       }
     }
   } finally {
     done.abort();
     await watcher.catch(() => {});
+  }
+}
+
+/** Checkpoints the daemon state to `state.json`. */
+function save(run: Run) {
+  run.state.updatedAt = new Date().toISOString();
+  writeJson(autopilotFiles(run.ctx.home).state, run.state);
+}
+
+/** Applies a confirmed autopilot trade: a buy opens its position, a sale marks or closes it. */
+function apply(state: DaemonState, t: PendingTrade, blockNumber: bigint) {
+  const p = state.positions.find((x) => isAddressEqual(x.token, t.token));
+  if (t.reason === "buy") {
+    if (p) return;
+    state.positions.push({
+      token: t.token,
+      symbol: t.symbol,
+      openedBlock: Number(blockNumber),
+      openedAt: null,
+      status: "open",
+      takeProfitDone: false,
+    });
+  } else if (p) {
+    if (t.reason === "take_profit") p.takeProfitDone = true;
+    else p.status = "closed";
+  }
+}
+
+/** Applies the pending trade of a daemon that died during it, if the journal shows it confirmed. */
+function recover(state: DaemonState, t: PendingTrade, home: string, keyHash: Hex) {
+  const side = t.reason === "buy" ? "buy" : "sell";
+  const confirmed = readJournal(home)
+    .slice(t.journalLength)
+    .find(
+      (r) =>
+        r.keyHash.toLowerCase() === keyHash.toLowerCase() &&
+        isAddressEqual(r.token, t.token) &&
+        r.side === side,
+    );
+  if (confirmed) apply(state, t, confirmed.blockNumber);
+}
+
+/**
+ * Sends one autopilot trade: checkpointed as pending first, applied to the positions and
+ * checkpointed again as soon as it confirmed, before anything else can fail.
+ */
+async function send(
+  run: Run,
+  a: { token: Address; symbol: string; reason: PendingTrade["reason"] },
+  calls: readonly Call[],
+) {
+  const { ctx, client, session, state } = run;
+  const pending = {
+    token: a.token,
+    symbol: a.symbol,
+    reason: a.reason,
+    journalLength: readJournal(ctx.home).length,
+  };
+  state.pending = pending;
+  save(run);
+  try {
+    const result = await execute({ session, client, home: ctx.home, launchpad: ctx.pad, calls });
+    if (ctx.env[CRASH_ENV] === a.reason) process.kill(process.pid, "SIGKILL");
+    apply(state, pending, result.receipt.blockNumber);
+    return result;
+  } finally {
+    state.pending = null; // a send that failed journalled nothing
+    save(run);
   }
 }
 
@@ -711,6 +802,9 @@ async function step(
       p.status = "closed"; // sold (by the autopilot or by hand)
       continue;
     }
+    p.openedAt ??= Number(
+      (await getBlock(client, { blockNumber: BigInt(p.openedBlock) })).timestamp,
+    );
     positions.push({
       token: p.token,
       symbol: p.symbol,
@@ -733,7 +827,22 @@ async function step(
     budget,
     budgetExhausted: state.budgetExhausted,
   });
-  for (const a of actions) await act(run, a, now, emit);
+  await actOn(run, actions, now, emit);
+}
+
+/** Carries out one decision's actions in order, checkpointing the state after each. */
+export async function actOn(
+  run: Run,
+  actions: readonly Action[],
+  now: bigint,
+  emit: LoopOptions["emit"],
+): Promise<void> {
+  for (const a of actions) {
+    // A buy refused for budget (11 / 43) ends the entries of this decision too; exits still run.
+    if (a.type === "buy" && run.state.budgetExhausted) continue;
+    await act(run, a, now, emit);
+    save(run);
+  }
 }
 
 /** Carries out one engine action; its failure is an event, except a session that ended. */
@@ -800,22 +909,12 @@ async function buy(run: Run, a: Extract<Action, { type: "buy" }>, emit: LoopOpti
     slippageBps: run.strategy.slippageBps,
     deadline: await ctx.deadline(),
   });
-  const { hash, receipt, trades } = await execute({
-    session,
-    client,
-    home: ctx.home,
-    launchpad: ctx.pad,
-    calls: plan.calls,
-  });
+  const { hash, trades } = await send(
+    run,
+    { token: a.token, symbol: a.symbol, reason: "buy" },
+    plan.calls,
+  );
   const trade = trades.find((t) => isAddressEqual(t.token, a.token));
-  const openedAt = (await getBlock(client, { blockNumber: receipt.blockNumber })).timestamp;
-  run.state.positions.push({
-    token: a.token,
-    symbol: a.symbol,
-    openedAt: Number(openedAt),
-    status: "open",
-    takeProfitDone: false,
-  });
   emit("bought", {
     token: a.token,
     symbol: a.symbol,
@@ -843,20 +942,9 @@ async function sell(run: Run, a: Extract<Action, { type: "sell" }>, emit: LoopOp
     deadline: await ctx.deadline(),
     recipient: session.account,
   });
-  const { hash, trades } = await execute({
-    session,
-    client,
-    home: ctx.home,
-    launchpad: ctx.pad,
-    calls: [call],
-  });
+  const { hash, trades } = await send(run, a, [call]);
   const trade = trades.find((t) => isAddressEqual(t.token, a.token));
   const received = trade?.quotePulled ?? 0n;
-  const p = run.state.positions.find((x) => isAddressEqual(x.token, a.token));
-  if (p) {
-    if (a.reason === "take_profit") p.takeProfitDone = true;
-    else p.status = "closed";
-  }
   emit("sold", {
     token: a.token,
     symbol: a.symbol,
