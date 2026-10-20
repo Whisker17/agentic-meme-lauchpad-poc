@@ -10,6 +10,7 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import {
   AgentSession,
   agentPolicyHookAbi,
@@ -179,20 +180,17 @@ describe.skipIf(!rpcUrl)("launchpad under the real AA contracts and sponsor (for
     ).status;
   const relayerTxs = () => client.getTransactionCount({ address: RELAYER.address });
 
-  const receipt = async (hash: Hex) => {
-    const t = Date.now();
-    try {
-      return await client.waitForTransactionReceipt({ hash, timeout: 30_000 });
-    } catch (e) {
-      const tx = await client.getTransaction({ hash }).catch((x: Error) => x.message.slice(0, 200));
-      const bn = await client.getBlockNumber().catch((x: Error) => x.message.slice(0, 200));
-      const rc = await client.getTransactionReceipt({ hash }).catch((x: Error) => x.message.slice(0, 200));
-      console.error("DEBUG receipt timeout", hash, Date.now() - t, { tx, bn, rc });
-      throw e;
-    } finally {
-      console.error("DEBUG receipt", hash, Date.now() - t, "ms");
+  /**
+   * Polls for the receipt. viem's `waitForTransactionReceipt` looks again only on a new block, and
+   * the fork mines none after a transaction that landed between two of its polls.
+   */
+  async function receipt(hash: Hex): Promise<TransactionReceipt> {
+    for (const deadline = Date.now() + 30_000; ; await sleep(50)) {
+      const r = await client.getTransactionReceipt({ hash }).catch(() => undefined);
+      if (r) return r;
+      if (Date.now() > deadline) throw new Error(`no receipt for ${hash} within 30 s`);
     }
-  };
+  }
   const tradeOf = (r: TransactionReceipt) => {
     const trades = parseEventLogs({ abi: memeLaunchpadAbi, eventName: "Trade", logs: r.logs });
     expect(trades).toHaveLength(1);
@@ -309,16 +307,13 @@ describe.skipIf(!rpcUrl)("launchpad under the real AA contracts and sponsor (for
   }
 
   beforeAll(async () => {
-    console.error("DEBUG start", new Date().toISOString());
     const fork = await startFork(rpcUrl as string);
-    console.error("DEBUG forked", new Date().toISOString());
     stopFork = fork.stop;
     client = publicClient(fork.url);
     wallet = (who) => walletFor(fork.url, who);
 
     // The launchpad from a fresh `forge build`, quoting in the deployed MockUSD.
     const { abi, bytecode } = forgeBuild()("MemeLaunchpad");
-    console.error("DEBUG built", new Date().toISOString());
     const deployed = await receipt(
       await wallet(DEPLOYER).deployContract({
         abi,
