@@ -650,9 +650,24 @@ fractional. The 10 s tick and the 2 s watcher poll are configurable (§6.1).
 - The watcher starts at the block after the current one, so a restart does not see a token twice.
   Only positions the autopilot opened are managed (sold from the session's inventory of that
   token); a restart manages the open positions of the previous run's `state.json` again.
+  (fixed 0.1.2 review) A trade's outcome reaches `state.json` before anything else can fail. The
+  daemon checkpoints each autopilot trade as `pending` (token, buy / take-profit / max hold, the
+  journal's record count) before the send. As soon as `execute` confirms, the trade is applied
+  (a buy opens its position, a take-profit sets `takeProfitDone`, a max hold closes it) and
+  checkpointed. A position records its buy's block (`openedBlock`). `openedAt`, that block's
+  chain time, is read when the position is next evaluated: until a read succeeds it is `null`, and
+  the failed step is retried. The state is checkpointed after every action. A start applies a
+  `pending` trade of a daemon that died before the checkpoint from the journal (D33): that is the
+  session's record for that token and side that was appended after the count. Measured on the fork
+  (`packages/cli/test/autopilot.recovery.fork.test.ts`) with every block read by number failing
+  after a buy, and with the daemon killed right after a confirmed buy and after a confirmed
+  take-profit. In each case the restarted daemon managed the position once and sold it later, and
+  did not take the profit again.
 - Budget: the hook's `remainingLimit(keyHash, account, MockUSD)` and the account's MockUSD
   `balanceOf`, read when new tokens are observed. A buy refused with 11 or 43 regardless is also
-  `budget_exhausted`. `budget_exhausted` stops entries until the next start.
+  `budget_exhausted`. `budget_exhausted` stops entries until the next start. (fixed 0.1.2 review)
+  That includes the buys that the same decision still holds: they are not sent, and its exits
+  still run.
 - A take-profit decided on the local model is re-checked with `quoteSell` and not sent when the
   view no longer meets it; `minOut` is the view's output less `slippagePercent`.
 - Revoke: `mantle-aa session revoke` removes the key from Calibur and tombstones it on the hook.
