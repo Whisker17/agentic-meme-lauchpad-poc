@@ -310,26 +310,36 @@ export async function startAutopilot(
 }
 
 /** `autopilot stop`: SIGTERM, wait for the daemon to finish its step and exit (else SIGKILL). */
-export async function stopAutopilot(home: string, timeoutMs = 60_000) {
+export async function stopAutopilot(
+  home: string,
+  timeoutMs = 60_000,
+  isAlive: (pid: number) => boolean | Promise<boolean> = alive,
+) {
   const pid = runningPid(home);
   if (!pid) throw new AutopilotStateError("Autopilot is not running");
   process.kill(pid, "SIGTERM");
-  for (const until = Date.now() + timeoutMs; alive(pid); ) {
-    if (Date.now() > until) {
+  let forced = false;
+  for (const until = Date.now() + timeoutMs; await isAlive(pid); ) {
+    if (!forced && Date.now() > until) {
       process.kill(pid, "SIGKILL");
-      const f = autopilotFiles(home);
-      rmSync(f.pid, { force: true });
-      const state = readJson(f.state);
-      if (state) writeJson(f.state, { ...state, status: "stopped", updatedAt: new Date() });
-      appendFileSync(
-        f.events,
-        `${toJson({ at: new Date(), event: "stopped", reason: "killed" })}\n`,
-      );
-      return { pid, stopped: true, forced: true };
+      forced = true;
     }
     await new Promise((r) => setTimeout(r, 100));
   }
-  return { pid, stopped: true, forced: false };
+  if (!forced) return { pid, stopped: true, forced: false };
+  // The killed daemon could not clean up, and a start may have replaced it since it died: under
+  // `acquirePid`'s lock, clean up only while the pid file and state still name the killed daemon.
+  const f = autopilotFiles(home);
+  await withSendLock(home, async () => {
+    if (readText(f.pid)?.trim() !== String(pid)) return;
+    rmSync(f.pid, { force: true });
+    const state = readJson(f.state);
+    if (state?.pid === pid) {
+      writeJson(f.state, { ...state, status: "stopped", updatedAt: new Date() });
+    }
+    appendFileSync(f.events, `${toJson({ at: new Date(), event: "stopped", reason: "killed" })}\n`);
+  });
+  return { pid, stopped: true, forced: true };
 }
 
 /** `autopilot status`: whether a daemon runs, its strategy and its last state. */
