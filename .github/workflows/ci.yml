@@ -60,7 +60,16 @@ jobs:
 
       - name: Test
         run: |
-          if [ "$SUITE" = e2e ]; then scope=(e2e/); else scope=(--exclude 'e2e/**'); fi
+          if [ "$SUITE" = e2e ]; then
+            if [ -z "$(git ls-files 'e2e/**/*.test.ts')" ]; then
+              echo "No e2e test files in this tree yet; skipping."
+              echo '{"testResults":[]}' > "$RUNNER_TEMP/vitest.json"
+              exit 0
+            fi
+            scope=(e2e/)
+          else
+            scope=(--exclude 'e2e/**')
+          fi
           pnpm test "${scope[@]}" --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/vitest.json"
 
       - name: Fork suites ran
