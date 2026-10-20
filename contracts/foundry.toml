@@ -1,0 +1,21 @@
+[profile.default]
+src = "src"
+script = "script"
+test = "test"
+out = "out"
+libs = ["lib"]
+auto_detect_remappings = false
+solc_version = "0.8.29"
+evm_version = "prague"
+optimizer = true
+optimizer_runs = 1000
+
+additional_compiler_profiles = [{ name = "via_ir", via_ir = true, optimizer_runs = 1000 }]
+compilation_restrictions = [{ paths = "lib/mantle-7702-sdk/contracts/lib/calibur/src/ERC7739.sol", via_ir = true }]
+
+[profile.default.invariant]
+runs = 512
+depth = 64
+
+[fmt]
+line_length = 100

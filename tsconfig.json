@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    "paths": {
+      "@0xwh1sker/mantle-meme-sdk": ["./packages/sdk/src/index.ts"]
+    }
+  },
+  "include": [
+    "test/**/*.ts",
+    "packages/*/src/**/*.ts",
+    "packages/*/test/**/*.ts",
+    "tools/*/src/**/*.ts",
+    "tools/*/test/**/*.ts",
+    "e2e/**/*.ts",
+    "vitest.config.ts"
+  ]
+}

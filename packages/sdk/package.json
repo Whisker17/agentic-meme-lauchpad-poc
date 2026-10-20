@@ -1,0 +1,24 @@
+{
+  "name": "@0xwh1sker/mantle-meme-sdk",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "SDK for the Mantle agentic meme launchpad",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@0xwh1sker/mantle-aa-sdk": "~0.1.4",
+    "viem": "2.57.7"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}
