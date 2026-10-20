@@ -249,6 +249,25 @@ describe("diagnoseFailure on anvil", { timeout: 60_000 }, () => {
     expect(await diagnose([create, buy(predicted, mUSD(1))])).toBeInstanceOf(
       InsufficientBalanceError,
     );
+    // Bought before it is created, it is still unknown.
+    expect(await diagnose([buy(predicted, mUSD(1)), create])).toBeInstanceOf(UnknownTokenError);
+  });
+
+  it("a create of another token, before or after the buy, does not skip the buy's quote", async () => {
+    const done = await createToken("Done two", "DONE2");
+    await trade("buy", done, mUSD(1000));
+    const create = createTokenCall(launchpad, {
+      name: "Other",
+      symbol: "OTHER",
+      salt: randomSalt(),
+    });
+    for (const [token, Expected] of [
+      [done, CurveCompletedError],
+      [usd, UnknownTokenError],
+    ] as const) {
+      expect(await diagnose([create, buy(token, mUSD(1))])).toBeInstanceOf(Expected);
+      expect(await diagnose([buy(token, mUSD(1)), create])).toBeInstanceOf(Expected);
+    }
   });
 
   it("explicit revert data is kept; only an opaque failure is diagnosed from the balance", async () => {
