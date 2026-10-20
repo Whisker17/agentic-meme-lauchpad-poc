@@ -336,6 +336,7 @@ export class Acceptance {
   async start() {
     this.simRpc = await new RpcProxy(this.cfg.rpcUrl).listen();
     this.sponsorRpc = await new RpcProxy(this.cfg.rpcUrl).listen();
+    this.agentRpc = await new RpcProxy(this.cfg.rpcUrl).listen();
     for (const p of [this.simRpc, this.sponsorRpc]) {
       p.onSent = (hash) => this.sentIn.set(hash, this.item);
     }
@@ -349,7 +350,6 @@ export class Acceptance {
       p.onError = (methods, detail) =>
         this.log(`${name} rpc: ${methods.join(",")} → ${this.scrub(detail)}`);
     }
-    this.agentRpc = await new RpcProxy(this.cfg.rpcUrl).listen();
     this.sim = new MarketSim({
       rpcUrl: this.simRpc.url,
       accounts: this.cfg.sim,
