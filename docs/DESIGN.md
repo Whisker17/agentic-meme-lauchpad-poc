@@ -651,9 +651,9 @@ review gates, release branches).
 - **Blocking needs** become an issue in an SDK release, written self-contained (spec +
   acceptance criteria, not only a link here), with a cross-project *blocks* relation to the
   meme issue that needs it. First instance: SDK Release 0.1.5, `mantle-aa session export`
-  (§8.1) blocks meme 0.1.1.
+  (§8.1, WHI-2036) blocks meme 0.1.1 (WHI-2047).
 - **Non-blocking feedback** goes to the SDK project's Backlog with the label
-  `from:meme-launchpad`, outside any release until the SDK owner schedules it.
+  `from:meme-launchpad`, outside any release until the SDK owner schedules it (first: WHI-2038, WHI-2039).
 - **Not** `docs/DEFERRED_ISSUES.md` of the SDK: that file records debt deferred by the SDK's
   own reviews.
 - **During implementation**, a meme implementer who finds a new SDK need records it on its meme
