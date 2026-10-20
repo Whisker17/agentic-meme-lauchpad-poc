@@ -110,6 +110,9 @@ const QUOTE_BUY = encodeFunctionData({
 
 /** The policy (DESIGN §8.1): every spend below is exact, so the limit runs out on schedule. */
 const TOTAL = 16; // create --dev-buy 5, buy 2, autopilot 3 + 3, manual 1 → 2 left (< 3: exhausted)
+/** Chain time; on Sepolia the flow waits it out, so it is short. */
+const MAX_HOLD_MINUTES = 2;
+const MAX_HOLD = BigInt(MAX_HOLD_MINUTES * 60);
 const strategy = (tag: string) => ({
   entry: {
     amountPerToken: "3",
@@ -122,7 +125,7 @@ const strategy = (tag: string) => ({
   exit: {
     takeProfitPercent: 50,
     takeProfitSellPercent: 50,
-    maxHoldMinutes: 1,
+    maxHoldMinutes: MAX_HOLD_MINUTES,
     stopLossPercent: null,
   },
   slippagePercent: 3,
@@ -572,20 +575,19 @@ export class Acceptance {
    * The mined receipt (bounded wait). On Sepolia, also waits until the head is two blocks past it:
    * the public RPC is load-balanced over nodes up to a block apart, and the next command must see it.
    */
-  async receipt(hash: Hex, blocksPast = 2n, pollMs = 1_000): Promise<TransactionReceipt> {
+  async receipt(hash: Hex): Promise<TransactionReceipt> {
     const r = await until(
       () => this.client.getTransactionReceipt({ hash }).catch(() => undefined),
       180_000,
       `the receipt of ${hash}`,
-      this.cfg.mode === "fork" ? 50 : pollMs,
+      this.cfg.mode === "fork" ? 50 : 1_000,
     );
     if (this.cfg.mode === "sepolia") {
       await until(
-        async () =>
-          (await this.client.getBlockNumber({ cacheTime: 0 })) >= r.blockNumber + blocksPast,
+        async () => (await this.client.getBlockNumber({ cacheTime: 0 })) >= r.blockNumber + 2n,
         120_000,
-        "blocks past the transaction",
-        pollMs,
+        "two blocks past the transaction",
+        1_000,
       );
     }
     return r;
@@ -609,13 +611,7 @@ export class Acceptance {
   }
 
   /** A plain-EOA transaction from market-sim wallet `i` (its own gas), through `simRpc`. */
-  private async eoa(
-    i: number,
-    call: { to: Address; data: Hex },
-    item: string,
-    what: string,
-    fast = false,
-  ) {
+  private async eoa(i: number, call: { to: Address; data: Hex }, item: string, what: string) {
     const wallet = createWalletClient({
       account: this.cfg.sim[i] as LocalAccount,
       chain: mantleSepolia,
@@ -623,8 +619,7 @@ export class Acceptance {
     });
     const hash = await wallet.sendTransaction(call);
     this.label(hash, item, what);
-    // `fast`: the CLI waits on this (its RPC timeout is 10 s); one block past is enough there.
-    const r = await (fast ? this.receipt(hash, 1n, 250) : this.receipt(hash));
+    const r = await this.receipt(hash);
     assert.equal(r.status, "success", `${what}: ${hash} reverted`);
     return r;
   }
@@ -1019,20 +1014,54 @@ export class Acceptance {
       "market-sim wallet 1 approves the launchpad",
     );
     const before = await this.snapshot(this.gate);
+    // Signed in advance, so that between the CLI's quote and its send the hook only broadcasts it
+    // and waits for it to be mined: the CLI's RPC client gives up on a reply after 10 s.
+    const wallet = createWalletClient({
+      account: this.cfg.sim[1] as LocalAccount,
+      chain: mantleSepolia,
+      transport: http(this.simRpc.url, { timeout: 30_000 }),
+    });
+    const deadline = (await this.client.getBlock()).timestamp + 600n;
+    const call = buyCall(PAD, {
+      token: this.gate,
+      amount: mUSD(50),
+      minOut: 0n,
+      deadline,
+      recipient: w1,
+    });
+    const prepared = await wallet.prepareTransactionRequest({ to: call.to, data: call.data });
+    const raw = await wallet.signTransaction({
+      ...prepared,
+      gas: (prepared.gas * 13n) / 10n,
+    } as never);
     let fired = 0;
     let moved: Hex | undefined;
     this.agentRpc.after = async (msgs) => {
       if (fired || !isQuoteBuy(msgs)) return;
       fired++;
-      const deadline = (await this.client.getBlock()).timestamp + 300n;
-      const r = await this.eoa(
-        1,
-        buyCall(PAD, { token: this.gate, amount: mUSD(50), minOut: 0n, deadline, recipient: w1 }),
+      const quotedAt = Date.now();
+      const hash = await this.client.sendRawTransaction({ serializedTransaction: raw });
+      this.label(
+        hash,
         "6",
         `market-sim wallet 1 buys 50 mUSD of ${symbol} between the CLI's quote and its send`,
-        true,
       );
-      moved = r.transactionHash;
+      const r = await until(
+        () => this.client.getTransactionReceipt({ hash }).catch(() => undefined),
+        30_000,
+        "the race buy",
+        200,
+      );
+      assert.equal(r.status, "success");
+      // The public RPC is load-balanced: let the next reads see the block (bounded, ≤ 2 s).
+      await until(
+        async () => (await this.client.getBlockNumber({ cacheTime: 0 })) >= r.blockNumber,
+        2_000,
+        "the race buy's block",
+        200,
+      ).catch(() => undefined);
+      this.log(`race buy mined ${Date.now() - quotedAt} ms after the CLI's quote`);
+      moved = hash;
     };
     try {
       // Not retried: the race is armed once.
@@ -1141,7 +1170,7 @@ export class Acceptance {
       (p: { token: string }) => getAddress(p.token) === moon,
     );
     assert.ok(position, "the autopilot holds the position");
-    await this.chainTimeAtLeast(BigInt(position.openedAt) + 61n);
+    await this.chainTimeAtLeast(BigInt(position.openedAt) + MAX_HOLD + 1n);
     const sold = await this.event(
       (e) => e.event === "sold" && e.token === moon && e.reason === "max_hold",
       "sold (max hold)",
@@ -1152,7 +1181,10 @@ export class Acceptance {
       `autopilot max-hold sells the rest of ${sold.symbol}`,
     );
     const at = (await this.client.getBlock({ blockNumber: rc.blockNumber })).timestamp;
-    assert.ok(at >= BigInt(position.openedAt) + 60n, "sold after maxHoldMinutes of chain time");
+    assert.ok(
+      at >= BigInt(position.openedAt) + MAX_HOLD,
+      "sold after maxHoldMinutes of chain time",
+    );
     assert.equal(await this.hookRead("inventory", moon), 0n);
     const after = this.ok(await this.meme("autopilot", "status"), "autopilot status");
     const closed = after.state.positions.find(

@@ -12,7 +12,7 @@ two places:
 | Once, by hand | `sepolia.ts` | Mantle Sepolia (or a local fork with `ACCEPTANCE_FORK=1`) | from the environment |
 
 The only difference is the clock. The autopilot's max hold is chain time: on a fork the flow moves
-it with `evm_increaseTime`, and on Sepolia it waits about a minute.
+it with `evm_increaseTime`, and on Sepolia it waits out the 2 minutes.
 
 ## Steps
 
