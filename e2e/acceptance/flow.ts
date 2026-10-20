@@ -532,8 +532,22 @@ export class Acceptance {
    * the flow did not label (market-sim's own approve) carries the item of the step that sent it.
    */
   transactions(): RunTx[] {
+    // The daemon may also trade on its own while a later step runs (e.g. a max-hold sell).
+    const daemon = new Map(
+      readEvents(this.agentHome)
+        .filter((e) => typeof e.hash === "string")
+        .map((e) => [
+          e.hash as Hex,
+          `autopilot ${e.event} ${e.symbol}${e.reason ? ` (${e.reason})` : ""}`,
+        ]),
+    );
     return [...new Set([...this.simRpc.sent, ...this.sponsorRpc.sent])].map(
-      (hash) => this.labels.get(hash) ?? { hash, item: this.sentIn.get(hash) ?? "", what: "" },
+      (hash) =>
+        this.labels.get(hash) ?? {
+          hash,
+          item: this.sentIn.get(hash) ?? "",
+          what: daemon.get(hash) ?? "",
+        },
     );
   }
 

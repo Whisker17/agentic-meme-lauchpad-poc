@@ -225,7 +225,12 @@ async function main() {
   for (const t of a.transactions()) {
     const { call, ...c } = await costOf(client, t.hash);
     const what =
-      t.what || (call === "approve" ? "market-sim approves the launchpad" : `market-sim ${call}`);
+      t.what ||
+      (c.from.toLowerCase() === relayer.toLowerCase()
+        ? "relayed for the account"
+        : call === "approve"
+          ? "market-sim approves the launchpad"
+          : `market-sim ${call}`);
     txs.push({ ...t, what, ...c, call, link: `${EXPLORER}${t.hash}` });
   }
   txs.sort((x, y) => (x.block === y.block ? x.index - y.index : x.block < y.block ? -1 : 1));
