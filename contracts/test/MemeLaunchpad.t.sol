@@ -71,11 +71,11 @@ contract MemeLaunchpadTest is LaunchpadBase {
         assertEq(s.virtualToken, VT0);
         assertEq(s.virtualQuote, 200e6);
         // ≈1.875e-7 mUSD per token = 0.1875 quote base units per whole token (FDV ≈ 187.5 mUSD).
-        uint256 startPrice = s.virtualQuote * 1e36 / s.virtualToken; // base units per token, 1e18
-        assertApproxEqRel(startPrice, 0.1875e18, 1e12);
+        // `priceE18` is quote base units per whole token, scaled by 1e18: 200e6 * 1e36 / VT0.
+        uint256 startPrice = s.priceE18;
+        assertEq(startPrice, 187_499_999_941_406_250);
+        assertApproxEqRel(startPrice, 1.875e17, 1e12);
         assertApproxEqRel(startPrice * (TOTAL / 1e18) / 1e18, 187.5e6, 1e12);
-        // The canonical `priceE18 = vQ * 1e18 / vT` (integer) at launch.
-        assertEq(s.priceE18, s.virtualQuote * 1e18 / s.virtualToken);
 
         // Filling the curve takes 600 mUSD net of fees (606.06 mUSD with the 1% fee).
         (uint256 out, uint256 used, uint256 fee, bool completes) =
@@ -93,7 +93,8 @@ contract MemeLaunchpadTest is LaunchpadBase {
         assertEq(s.realQuote, 600e6);
         assertEq(s.sold, CURVE);
         assertEq(uint8(s.status), uint8(MemeLaunchpad.Status.Completed));
-        uint256 endPrice = s.virtualQuote * 1e36 / s.virtualToken;
+        uint256 endPrice = s.priceE18;
+        assertEq(endPrice, 2_999_999_996_250_000_004);
         assertApproxEqRel(endPrice * 1e18 / startPrice, 16e18, 1e11); // ×16
         assertApproxEqRel(endPrice * (TOTAL / 1e18) / 1e18, 3000e6, 1e11); // FDV ≈ 3,000 mUSD
     }

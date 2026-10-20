@@ -172,8 +172,10 @@ Per token, constant product over virtual reserves:
 
 - State per token: `vT` (virtual token reserve), `vQ` (virtual quote reserve), `sold`
   (`CURVE_SUPPLY` − tokens still on the curve), `realQuote` (`vQ − VIRTUAL_QUOTE_0`), `status`.
-- **Canonical price** `priceE18 = vQ · 1e18 / vT`: quote base units (6 decimals) per 10¹⁸ token
-  base units (one whole token). All arithmetic is in base units; human units are display only.
+- **Canonical price** `priceE18 = vQ · 1e36 / vT`: quote base units (6 decimals) per 10¹⁸ token
+  base units (one whole token), scaled by 10¹⁸ — ≈ 1.875 × 10¹⁷ at launch, ×16 at completion.
+  (Changed 2026-10-20 from `vQ · 1e18 / vT`, which truncates to 0 at launch with these
+  parameters.) All arithmetic is in base units; human units are display only.
 - Spot price ≈ 1.875 × 10⁻⁷ mUSD per token at start (FDV ≈ 187.5 mUSD); at completion
   `vT ≈ 266,666,667`, `vQ ≈ 800` mUSD, price ×16 (FDV ≈ 3,000 mUSD). Filling the curve takes
   ≈600 mUSD net of fees.

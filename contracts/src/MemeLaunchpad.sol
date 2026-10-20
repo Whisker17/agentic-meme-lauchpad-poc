@@ -36,7 +36,7 @@ contract MemeLaunchpad is ILaunchpad {
         uint256 virtualQuote; // vQ
         uint256 sold; // curve tokens no longer held by the curve
         uint256 realQuote; // vQ - virtualQuote0
-        uint256 priceE18; // vQ * 1e18 / vT: quote base units per whole token
+        uint256 priceE18; // vQ * 1e36 / vT: quote base units per whole token (1e18 base units), x 1e18
         address creator;
         uint64 createdAt;
         Status status;
@@ -285,6 +285,12 @@ contract MemeLaunchpad is ILaunchpad {
     }
 
     /// @notice Reserves, progress and price of `token`; all zero (status `None`) if unknown.
+    /// @dev    `priceE18 = vQ * 1e36 / vT`: quote base units per whole token (1e18 token base
+    ///         units), scaled by 1e18. A non-completing buy leaves `vQ < K / vTEnd` and the
+    ///         completing buy sets `vQ = ceil(K / vTEnd)`, with `vTEnd = VIRTUAL_TOKEN_0 -
+    ///         CURVE_SUPPLY >= 1`; sells only lower `vQ`. So every reachable `vQ <= ceil(K / vTEnd)`
+    ///         (800e6 with the design's parameters) and `vQ * 1e36` cannot overflow while that
+    ///         bound stays below `type(uint256).max / 1e36` (about 1.16e41).
     function curveState(address token) external view returns (CurveState memory s) {
         Curve storage c = _curves[token];
         if (c.status == Status.None) return s;
@@ -293,7 +299,7 @@ contract MemeLaunchpad is ILaunchpad {
             virtualQuote: c.vQ,
             sold: VIRTUAL_TOKEN_0 - c.vT,
             realQuote: c.vQ - VIRTUAL_QUOTE_0,
-            priceE18: c.vQ * 1e18 / c.vT,
+            priceE18: c.vQ * 1e36 / c.vT,
             creator: c.creator,
             createdAt: c.createdAt,
             status: c.status
