@@ -16,7 +16,7 @@
     "generate": "node scripts/generate.mjs"
   },
   "dependencies": {
-    "@0xwh1sker/mantle-aa-sdk": "~0.1.4",
+    "@0xwh1sker/mantle-aa-sdk": "~0.1.5",
     "viem": "2.57.7"
   },
   "devDependencies": {
