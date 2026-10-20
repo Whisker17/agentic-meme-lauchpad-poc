@@ -4,7 +4,8 @@
 > independent design review (Appendix B, findings R-1…R-8).
 > v0.3: the facts measured and the decisions taken in 0.1.0 are recorded in place, each marked
 > "(measured 0.1.0)" or "(decision 2026-10-20)".
-> v0.4: likewise for 0.1.1 (command mode), marked "(measured 0.1.1)" or "(decision 2026-10-20)".
+> v0.4: likewise for 0.1.1 (command mode), marked "(measured 0.1.1)" or "(decision 2026-10-20)",
+> and the behaviour corrected by the 0.1.1 release review, marked "(fixed 0.1.1 review)".
 
 > **Nature:** proof of concept on Mantle Sepolia. **The contracts are not audited.**
 > **Upstream:** `mantle-7702-sdk` v0.1.4 (`@0xwh1sker/mantle-aa-{sdk,sponsor,cli}`), whose
@@ -257,9 +258,11 @@ Errors (measured 0.1.0, `contracts/src/MemeLaunchpad.sol`): `UnknownToken` (not 
 event keeps the name `CurveCompleted`, because solc rejects an error and an event sharing one
 identifier), `InsufficientOutput` (`out < minOut`), `ZeroOutput`, `ZeroAmount`, `Expired`,
 `NotCreator`, `InvalidParams` (constructor). The CLI maps the first three to exit 42 / 40 / 41
-(§6.3). (measured 0.1.1) The CLI sees these errors directly only from a view (`quoteBuy`,
+(§6.3). (measured 0.1.1) The CLI sees these errors directly from a view (`quoteBuy`,
 `quoteSell`). On a send, Calibur drops the launchpad's revert data (§5 Errors), so the SDK works
-out the meme error from chain state.
+out the meme error from chain state. (fixed 0.1.1 review) Only such an opaque failure is worked
+out from chain state; a send failure that carries explicit revert data is decoded from it (§5
+Errors).
 
 #### 4.3.1 createToken
 
@@ -401,6 +404,12 @@ iteration means a new launchpad version; tokens completed on v1 are not migrated
   from that transaction's own `Trade` logs in the receipt. It is the **only** source of cost
   basis; there is no historical event scan by account (the `Trade` event cannot tell two
   sessions of one account apart).
+  (fixed 0.1.1 review) A crash mid-append can leave a torn last line without its newline. Reading
+  skips that line when it is not a whole record, so that trade's history is unknown and the
+  token's cost basis reads `null` (the journal no longer accounts for the inventory). The next
+  append (under the send lock) first cuts the torn line off, or, when it is a whole record that
+  only lost its newline, keeps it and terminates it. A malformed line anywhere else still fails
+  the read loudly (`packages/sdk/src/journal.ts`).
 - **Portfolio** (minimal, read-only, needs no root profile): per token `{balance, session
   inventory (hook.inventory), weighted cost basis incl. buy fees (journal), current sell value net
   of the sell fee (quoteSell), unrealised PnL}`; plus `remainingLimit` for MockUSD, the hook
@@ -413,24 +422,34 @@ iteration means a new launchpad version; tokens completed on v1 are not migrated
   registered (see Symbol resolution) plus every token in the journal
   (`packages/sdk/src/portfolio.ts`).
 - **Executor**: wraps `AgentSession.simulate` + `exec` (relayer). Before sending it takes a
-  **cross-process file lock** `<agentHome>/meme/send.lock`, and retries `SPONSOR_BUSY` with
-  backoff (max 60 s). One process at a time per account, so the autopilot and a TG command never
-  race the sponsor. (measured 0.1.1) `execute` takes the lock, calls
-  `AgentSession.exec` (simulate, then submit), reads the receipt and journals the transaction's
-  own `Trade` logs. A failed send is explained from chain state, not from revert data (Errors
-  below).
+  **cross-process file lock** `<agentHome>/meme/send.lock`, and retries `SPONSOR_BUSY` with backoff
+  (max 60 s). One process at a time per account, so the autopilot and a TG command never race the
+  sponsor. (measured 0.1.1) `execute` takes the lock, calls `AgentSession.exec` (simulate, then
+  submit), reads the receipt and journals the transaction's own `Trade` logs. (fixed 0.1.1 review) A
+  failed send carrying explicit revert data is explained from that data; only an opaque one is
+  explained from chain state (Errors below). The receipt's status is checked: a reverted receipt is
+  an `ExecutionRevertedError` naming the transaction hash, whatever the executor (sponsor) reported,
+  and nothing is journalled for it. A lock naming a pid that no longer runs is broken, and so is one
+  naming no pid that is older than 10 s (its creator died between the exclusive create and the pid
+  write). Breaking is serialised by a short-lived `send.lock.break` guard, under which the lock is
+  read again (`packages/sdk/src/lock.ts`).
 - **Errors**: AA SDK errors pass through; meme errors `CurveCompletedError`, `SlippageError`,
-  `UnknownTokenError`, `InsufficientBalanceError`, `AutopilotStateError`.
-  (measured 0.1.1) The deployed Calibur reverts a failing session call with a bare `CallFailed()`
-  (`0x3204506f`), and the launchpad's revert data is lost. A batch that reverts on chain carries
-  no data at all. So `execute` does not decode a failed send. It diagnoses it from chain state
-  (`diagnoseFailure`): for each launchpad `buy` / `sell` in the batch it checks the quote view's
-  revert (`UnknownTokenError`, `CurveCompletedError`), then the account's balance
-  (`InsufficientBalanceError`), then the current quote against `minOut` (`SlippageError`).
-  This is a heuristic: a slippage failure is diagnosed by re-quoting the current state. Anything
-  it cannot explain passes through unchanged as the AA error (exit 30 for a revert).
-  `toMemeError` still decodes the launchpad errors from a view's revert data
-  (`packages/sdk/src/{errors,executor}.ts`).
+  `UnknownTokenError`, `InsufficientBalanceError`, `AutopilotStateError`. (measured 0.1.1) The
+  deployed Calibur reverts a failing session call with a bare `CallFailed()` (`0x3204506f`), and the
+  launchpad's revert data is lost. A batch that reverts on chain carries no data at all. (fixed
+  0.1.1 review) `execute` (`diagnoseFailure`) keeps explicit revert data: a launchpad error decoded
+  from it (also inside Calibur's `CallFailed(bytes)` wrapper) is mapped by `toMemeError`, and any
+  other revert data passes through unchanged. Only an opaque failure (no data, `0x` or the bare
+  `CallFailed()`), a reverted receipt included, is diagnosed from chain state, in the contract's
+  order: for each launchpad `buy` / `sell` in the batch it checks the quote view's revert
+  (`UnknownTokenError`, `CurveCompletedError`), then the account's balance against what the trade
+  pulls (a buy: the quote's `amountInUsed`; `InsufficientBalanceError`), then the quoted output
+  against `minOut` (`SlippageError`). A buy of a token the same batch creates has no quote yet and
+  is checked for balance only. A quote view reverting with an unmapped error (e.g. `ZeroOutput`)
+  explains nothing for that call (a single-trade batch stays exit 30). This is a heuristic: a
+  slippage failure is diagnosed by re-quoting the current state. Anything it cannot explain passes
+  through unchanged as the AA error (exit 30 for a revert). `toMemeError` also decodes the launchpad
+  errors from a view's revert data (`packages/sdk/src/{errors,executor}.ts`).
 - **Strategy engine** (pure, unit-tested): `(strategy, events, positions, now) → actions`.
 
 ## 6. CLI (`mantle-meme`)
@@ -515,8 +534,10 @@ Meme codes:
 - The `--json` error is `{code, type, message, …fields}`, carrying the error's own fields, e.g.
   `remaining` (11), `held` (12), `candidates` (42), `balance` / `needed` (43). Exit 40 always
   carries the §4.5 text.
-- On a send, 40 / 41 / 43 come from the meme error that the SDK's `execute` diagnoses from chain
-  state, never from Calibur's revert data (§5 Errors). An undiagnosable revert is exit 30
+- (fixed 0.1.1 review) On a send, 40 / 41 / 42 / 43 come from the meme error that the SDK's
+  `execute` decodes from explicit revert data or, for an opaque failure (Calibur's bare
+  `CallFailed()` or no data), diagnoses from chain state (§5 Errors). An undiagnosable revert,
+  including a reverted receipt the sponsor reported as a success, is exit 30
   `EXECUTION_REVERTED`. Before trading, `buy`, `sell` and `quote` check the curve (40) and resolve
   the token (42).
 - 44 is reserved until the autopilot ships (0.1.2).
@@ -530,7 +551,10 @@ launchpad, amount), buy(token, amount, minOut, now+300, account)]` → lock →
 `AgentSession.simulate` → `exec` (relayer) → receipt → journal → result with tx link. Sell is a
 single `sell` call, `amount ≤` this session's inventory (checked locally, exit 12 otherwise).
 (measured 0.1.1) A failure in `simulate` or on chain surfaces as Calibur's bare `CallFailed()`.
-The SDK maps it to 40 / 41 / 43 from chain state, otherwise it is exit 30 (§5 Errors, §6.3).
+(fixed 0.1.1 review) The SDK maps such an opaque failure to 40 / 41 / 42 / 43 from chain state,
+and a failure with explicit revert data from that data; otherwise it is exit 30 (§5 Errors,
+§6.3). The receipt's status is checked: a reverted receipt is exit 30 naming the hash, whatever
+the sponsor reported, and is not journalled.
 Exit 41 was measured on the fork through a price move between the quote and the send.
 
 ### 7.2 Create with dev buy
@@ -792,7 +816,7 @@ review gates, release branches).
 | Item | Handling |
 |---|---|
 | Create + buy-on-predicted-token in one batch may trip the SDK simulation, the sponsor or the hook | Closed (measured 0.1.0): spike PASS on the full sponsor path and direct (§7.2); the two-transaction fallback is not needed |
-| Journal loss or a second session | Cost basis `null`, autopilot leaves the position alone; sell sizing stays on-chain; one session per account is the supported scope |
+| Journal loss or a second session | Cost basis `null`, autopilot leaves the position alone; sell sizing stays on-chain; one session per account is the supported scope. (fixed 0.1.1 review) A torn last line from a crash is skipped on read (that token's cost basis `null`) and cut before the next append; corruption elsewhere fails loudly (§5 Journal) |
 | Public RPC lag breaks sniping latency or the watcher | Overlap re-scan, dedup; configurable RPC URL |
 | Sponsor budget drained by autopilot | Sponsor daily budget + per-account gas cap; the policy caps principal, not gas |
 | Positions stranded at `Completed` | Accepted; reported to the user; graduation is a later version |
