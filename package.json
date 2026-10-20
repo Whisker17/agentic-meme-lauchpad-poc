@@ -1,0 +1,25 @@
+{
+  "name": "mantle-agentic-meme-launchpad",
+  "private": true,
+  "type": "module",
+  "description": "Agentic meme launchpad on Mantle Sepolia: AI-driven, 7702 smart account, gasless.",
+  "packageManager": "pnpm@11.17.0",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "build": "pnpm -r --if-present build",
+    "check": "pnpm lint && pnpm typecheck && pnpm test"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.15",
+    "@types/node": "^24.19.2",
+    "typescript": "^7.0.2",
+    "viem": "2.57.7",
+    "vitest": "^5.0.5"
+  }
+}

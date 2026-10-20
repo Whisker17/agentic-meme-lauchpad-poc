@@ -1,0 +1,6 @@
+forge-std/=lib/forge-std/src/
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
+mantle-7702-sdk/=lib/mantle-7702-sdk/contracts/
+account-abstraction/=lib/mantle-7702-sdk/contracts/lib/account-abstraction/contracts/
+calibur/=lib/mantle-7702-sdk/contracts/lib/calibur/src/
+solady/=lib/mantle-7702-sdk/contracts/lib/calibur/lib/solady/src/
