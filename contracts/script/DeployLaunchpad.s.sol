@@ -58,6 +58,8 @@ contract DeployLaunchpad is Script {
         require(launchpad.code.length != 0, "launchpad has no code");
 
         bytes memory args = constructorArgs();
+        require(book.readAddress(".MemeLaunchpad.quoteToken") == QUOTE, "book quoteToken");
+        require(book.readAddress(".MemeLaunchpad.treasury") == TREASURY, "book treasury");
         require(
             keccak256(book.readBytes(".MemeLaunchpad.constructorArgs.encoded")) == keccak256(args),
             "constructorArgs"
