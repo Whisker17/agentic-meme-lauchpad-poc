@@ -1,0 +1,28 @@
+{
+  "name": "@0xwh1sker/mantle-meme-market-sim",
+  "version": "0.1.2",
+  "private": true,
+  "type": "module",
+  "description": "Market simulator for the Mantle agentic meme launchpad (plain EOAs; not published)",
+  "main": "./dist/sim.js",
+  "types": "./dist/sim.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/sim.d.ts",
+      "import": "./dist/sim.js"
+    }
+  },
+  "bin": {
+    "market-sim": "./dist/bin.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@0xwh1sker/mantle-meme-sdk": "workspace:*",
+    "viem": "2.57.7"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}
