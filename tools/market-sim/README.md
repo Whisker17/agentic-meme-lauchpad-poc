@@ -48,7 +48,9 @@ pay out, so it never ends a curve the autopilot holds by accident.
 
 ## Pump
 
-"+X%" is the **spot price** `curveState(token).priceE18` after the pump vs right before it.
+"+X%" is the **spot price** `priceE18` the pump's own buy left (from the reserves in its `Trade`
+event) vs `curveState(token).priceE18` right before it. The event never reads the price again after
+the buy: a take-profit that sells into the pump right away does not change what it reports.
 Price is `vQ²/k` up to rounding, so the target reserve is `vQ · sqrt(1 + X/100)`; `planPump`
 computes the buy from that and checks it with the contract's own arithmetic (`simulateBuy`).
 From launch (vQ = 200 mUSD) +50% costs ≈ 45.4 mUSD and +100% ≈ 83.7 mUSD, fee included. A target
@@ -90,4 +92,5 @@ completing `amountInUsed` and returns `completed: true`; the token's status beco
 
 - `test/sim.test.ts`: `planPump` against the local curve model; CLI parsing.
 - `test/market-sim.fork.test.ts` (needs `MANTLE_SEPOLIA_RPC_URL`): create / buy / sell from
-  plain EOAs, `pump` past +50%, a truncating buy to `Completed`, and `run` with no errors.
+  plain EOAs, `pump` past +50% (also when a sale lands right after the pump's buy), a
+  truncating buy to `Completed`, and `run` with no errors.

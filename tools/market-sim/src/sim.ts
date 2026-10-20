@@ -71,7 +71,10 @@ export interface PumpEvent {
   wallet: Address;
   token: Address;
   percent: number;
-  /** `curveState.priceE18` right before and after the pump. */
+  /**
+   * `curveState.priceE18` right before the pump, and the price its own buy left (from the
+   * reserves in that buy's `Trade` event, so a later trade cannot change it).
+   */
   priceBefore: bigint;
   priceAfter: bigint;
   quoteAmount: bigint;
@@ -437,14 +440,18 @@ export class MarketSim {
       percent,
     );
     const bought = await this.buy(token, plan.amountIn, { wallet: this.wallets.indexOf(w) });
-    const after = await curveState(w, this.launchpad, token);
+    // The pump's own `Trade` reserves, not a latest-state read: an autopilot may already have
+    // sold into the pump by now.
+    const r = await w.getTransactionReceipt({ hash: bought.tx });
+    const [trade] = parseEventLogs({ abi: memeLaunchpadAbi, eventName: "Trade", logs: r.logs });
+    if (!trade) throw new Error(`no Trade in ${bought.tx}`);
     return this.emit({
       kind: "pump",
       wallet: w.account.address,
       token,
       percent,
       priceBefore: s.priceE18,
-      priceAfter: after.priceE18,
+      priceAfter: priceE18({ vQ: trade.args.vQ, vT: trade.args.vT }),
       quoteAmount: bought.quoteAmount,
       completed: bought.completed,
       tx: bought.tx,

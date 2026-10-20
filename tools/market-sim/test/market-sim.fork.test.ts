@@ -83,6 +83,40 @@ describe.skipIf(!rpcUrl)("market-sim on a Mantle Sepolia fork", { timeout: 120_0
     });
   }
 
+  it("pump reports the price its own buy left even when a sale lands right after it", async () => {
+    // As the autopilot's take-profit can: a sale confirmed between the pump's buy and the moment
+    // `pump()` resolves its event.
+    let saleAfterPump: (() => Promise<unknown>) | undefined;
+    class RacedSim extends MarketSim {
+      override async buy(...args: Parameters<MarketSim["buy"]>) {
+        const bought = await super.buy(...args);
+        const sale = saleAfterPump;
+        saleAfterPump = undefined;
+        await sale?.();
+        return bought;
+      }
+    }
+    const raced = new RacedSim({
+      rpcUrl: forkUrl,
+      accounts: sim.wallets.map((w) => w.account),
+      pollingIntervalMs: 50,
+    });
+    const { token } = await raced.createToken({ wallet: 0 });
+    const entry = await raced.buy(token, 3n * mUSD, { wallet: 1 });
+    const before = (await state(token)).priceE18;
+    let pumped = 0n;
+    saleAfterPump = async () => {
+      pumped = (await state(token)).priceE18;
+      await raced.sell(token, entry.tokenAmount, { wallet: 1 });
+    };
+    const pump = await raced.pump(token, { wallet: 2 });
+    const now = (await state(token)).priceE18;
+    expect(now).toBeLessThan(pumped); // the sale really landed before pump() returned
+    expect(pump.priceBefore).toBe(before);
+    expect(pump.priceAfter).toBe(pumped);
+    expect(pump.priceAfter).toBeGreaterThanOrEqual(before * 2n);
+  });
+
   it("an oversized buy completes the curve through on-chain truncation", async () => {
     const { token } = await sim.createToken({ wallet: 0 });
     await sim.buy(token, 100n * mUSD, { wallet: 1 });
