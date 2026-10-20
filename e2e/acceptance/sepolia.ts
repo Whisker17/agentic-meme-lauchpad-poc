@@ -79,6 +79,8 @@ const simKeys = [0, 1, 2].map((addressIndex) =>
 const SECRETS = [mnemonic, relayerKey, ...simKeys];
 
 let a: Acceptance | undefined;
+/** The rehearsal's anvil fork; stopped on every way out. */
+let stopFork: (() => void) | undefined;
 const scrub = (text: string) => {
   if (a) return a.scrub(text);
   let t = text.replaceAll(upstream, "<rpc-url>");
@@ -144,7 +146,6 @@ async function main() {
     throw new Error("refusing a Sepolia run from a tree with uncommitted changes");
 
   let rpcUrl = upstream;
-  let stopFork: (() => void) | undefined;
   if (fork) {
     const f = await startFork(upstream);
     stopFork = f.stop;
@@ -315,12 +316,16 @@ async function main() {
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
     log(`${signal}: stopping`);
-    void (a?.stop() ?? Promise.resolve()).finally(() => process.exit(130));
+    void (a?.stop() ?? Promise.resolve()).finally(() => {
+      stopFork?.();
+      process.exit(130);
+    });
   });
 }
 
 main().catch(async (e) => {
   log(`run failed: ${scrub(e instanceof Error ? (e.stack ?? e.message) : String(e))}`);
   await a?.stop();
+  stopFork?.();
   process.exit(1);
 });

@@ -11,9 +11,10 @@ DESIGN §9.1 items 1–8 on the real chain, as the definition of done requires (
   market-sim proxy, so it is listed"), a commit of the pull request that added this file, with a
   clean tracked tree. The script records the commit and
   refuses a Sepolia run from a tree with uncommitted changes. Since then the script changed in
-  one way only: it labels a transaction the daemon sends on its own, which this run's table
-  showed blank. That is row "autopilot sells the rest of MOONKIWKTB" below, labelled here from
-  the daemon's `events.jsonl`.
+  two ways only. It labels a transaction the daemon sends on its own, which this run's table
+  showed blank: that is row "autopilot sells the rest of MOONKIWKTB" below, labelled here from
+  the daemon's `events.jsonl`. And it stops its rehearsal fork (`ACCEPTANCE_FORK=1`) on every
+  way out.
 - **Command** (detached, with the keys in the environment only):
 
   ```bash
