@@ -43,8 +43,12 @@ function startAnvil(rpcUrl: string, timeoutMs: number): Promise<{ url: string; s
       clearTimeout(timer);
       anvil.removeAllListeners("close");
       // From here on drain both pipes without keeping anything, so anvil never blocks on one.
-      anvil.stdout.off("data", keep).resume();
-      anvil.stderr.off("data", keep).resume();
+      anvil.stdout.off("data", keep);
+      anvil.stderr.off("data", keep);
+      const t0 = Date.now();
+      const dbg = (d: Buffer) => process.stderr.write(`[anvil +${Date.now() - t0}ms] ${String(d).replace(/\w+:\/\/[^\s)]+/g, "<url>")}`);
+      anvil.stdout.on("data", dbg);
+      anvil.stderr.on("data", dbg);
       resolve({ url: `http://127.0.0.1:${port}`, stop: () => anvil.kill() });
     };
     anvil.stdout.on("data", keep);
