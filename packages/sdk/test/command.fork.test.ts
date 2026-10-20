@@ -4,7 +4,7 @@
 // the unknown cost basis are checked against chain state.
 // Skipped only when MANTLE_SEPOLIA_RPC_URL is unset; CI sets it and fails on a skip.
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { appendFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
@@ -389,7 +389,7 @@ describe.skipIf(!rpcUrl)("command mode under the real AA contracts and sponsor (
     expect(readJournal(home)).toHaveLength(before);
   }, 120_000);
 
-  it("portfolio equals chain state and the journal; with the journal deleted the cost basis is null", async () => {
+  it("portfolio equals chain state and the journal, past a torn last line; with the journal deleted the cost basis is null", async () => {
     // Sell half of the inventory through execute: the journal now holds two buys and a sell.
     const held = await hookRead("inventory", tokenA);
     const half = held / 2n;
@@ -401,8 +401,12 @@ describe.skipIf(!rpcUrl)("command mode under the real AA contracts and sponsor (
       deadline: await deadline(),
       recipient: me,
     });
+    // A crash cut the journal's last line short: the next append and the portfolio still work.
+    const journalled = readJournal(home);
+    appendFileSync(journalPath(home), '{"keyHash":');
     const { trades } = await execute({ session, client, home, launchpad: pad, calls: [sell] });
     expect(trades).toMatchObject([{ side: "sell", tokens: half, quotePulled: sold.amountOut }]);
+    expect(readJournal(home)).toEqual([...journalled, ...trades]);
 
     const buys = readJournal(home).filter((r) => r.side === "buy");
     const paid = buys.reduce((s, r) => s + r.quotePulled, 0n);

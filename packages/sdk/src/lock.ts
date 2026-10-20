@@ -26,9 +26,10 @@ function create(file: string, content: string): boolean {
 }
 
 /**
- * Removes the lock if the process that holds it is gone. Breaking it is serialised by a
- * short-lived `.break` file, under which the holder is read again, so a waiter never removes a
- * lock another waiter has just taken.
+ * Removes the lock if the process that holds it is gone, or if it names no pid and is older than
+ * 10 s (its creator died between the exclusive create and the pid write; a live one is that old
+ * only for microseconds). Breaking it is serialised by a short-lived `.break` file, under which the
+ * holder is read again, so a waiter never removes a lock another waiter has just taken.
  */
 function breakIfStale(lock: string): void {
   const guard = `${lock}.break`;
@@ -40,8 +41,11 @@ function breakIfStale(lock: string): void {
     return;
   }
   try {
-    const pid = Number.parseInt(readFileSync(lock, "utf8"), 10);
-    if (Number.isInteger(pid) && pid > 0 && !alive(pid)) rmSync(lock, { force: true });
+    const owner = readFileSync(lock, "utf8").trim();
+    const stale = /^[1-9]\d*$/.test(owner)
+      ? !alive(Number(owner))
+      : Date.now() - statSync(lock).mtimeMs > 10_000;
+    if (stale) rmSync(lock, { force: true });
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
   } finally {
