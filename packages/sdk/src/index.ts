@@ -11,3 +11,4 @@ export * from "./journal.js";
 export * from "./lock.js";
 export * from "./portfolio.js";
 export * from "./quotes.js";
+export * from "./strategy.js";

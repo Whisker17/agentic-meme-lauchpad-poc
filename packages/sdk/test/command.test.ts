@@ -386,7 +386,8 @@ describe("toMemeError", () => {
 });
 
 describe("execute", () => {
-  it("a reverted receipt is ExecutionRevertedError with its hash, though the executor reported success; nothing is journalled", async () => {
+  /** `execute` of one call whose receipt (status `status`) holds one Trade log of this account. */
+  async function sent(status: "0x0" | "0x1", correlationId?: string) {
     const hash = keccak256("0xbad");
     // As the published AgentSession.exec resolves when the executor (the sponsor's word) says success.
     const session = {
@@ -394,7 +395,6 @@ describe("execute", () => {
       keyHash: KEY,
       exec: async () => ({ hash, success: true }),
     } as unknown as AgentSession;
-    // The chain's receipt says reverted. Its Trade log is never on chain; it shows nothing is parsed.
     const receipt = {
       transactionHash: hash,
       transactionIndex: "0x0",
@@ -408,7 +408,7 @@ describe("execute", () => {
       effectiveGasPrice: "0x1",
       logsBloom: `0x${"00".repeat(256)}`,
       logs: [tradeLog({ block: 42n, logIndex: 0, tx: hash })],
-      status: "0x0",
+      status,
       type: "0x2",
     };
     const client = createClient({
@@ -421,12 +421,36 @@ describe("execute", () => {
     });
     const home = mkdtempSync(join(tmpdir(), "meme-execute-"));
     const calls = [{ to: OTHER, data: "0x" as Hex, value: 0n }];
-    const err = await execute({ session, client, home, launchpad: PAD, calls }).catch(
-      (e: unknown) => e,
-    );
+    const result = await execute({
+      session,
+      client,
+      home,
+      launchpad: PAD,
+      calls,
+      ...(correlationId !== undefined && { correlationId }),
+    }).catch((e: unknown) => e);
+    return { hash, home, result };
+  }
+
+  it("a reverted receipt is ExecutionRevertedError with its hash, though the executor reported success; nothing is journalled", async () => {
+    // The chain's receipt says reverted. Its Trade log is never on chain; it shows nothing is parsed.
+    const { hash, home, result: err } = await sent("0x0");
     expect(err).toBeInstanceOf(ExecutionRevertedError);
     expect((err as ExecutionRevertedError).message).toContain(hash);
     expect(readJournal(home)).toEqual([]);
+  });
+
+  it("journals the caller's correlationId with the transaction's records; without one, records are as before", async () => {
+    const tagged = await sent("0x1", "trade-1");
+    expect(readJournal(tagged.home)).toEqual([
+      expect.objectContaining({ txHash: tagged.hash, side: "buy", correlationId: "trade-1" }),
+    ]);
+    expect((tagged.result as { trades: JournalRecord[] }).trades[0]?.correlationId).toBe("trade-1");
+
+    const plain = await sent("0x1");
+    const [record] = readJournal(plain.home);
+    expect(record).toMatchObject({ txHash: plain.hash, side: "buy" });
+    expect(Object.keys(record as object)).not.toContain("correlationId");
   });
 });
 

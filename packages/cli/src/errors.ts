@@ -22,12 +22,21 @@ export interface ErrorDescription {
   error: { code: string; type: string; message: string; [field: string]: unknown };
 }
 
+/** An error another process (the autopilot daemon) already described; passed through as is. */
+export class ReportedError extends Error {
+  override readonly name = "ReportedError";
+  constructor(readonly description: ErrorDescription) {
+    super(description.error.message);
+  }
+}
+
 /**
  * The one mapping from error to exit code and `--json` error. A launchpad revert or a meme error
  * of the SDK (`execute` diagnoses a failed batch from chain state) is 40–44; everything else goes
  * through the AA CLI's own `describeError`, so AA codes (0, 1, 10–13, 20, 21, 30) are unchanged.
  */
 export function describe(error: unknown): ErrorDescription {
+  if (error instanceof ReportedError) return error.description;
   const e = toMemeError(error);
   if (!(e instanceof MemeError)) return describeError(e);
   const fields = Object.fromEntries(

@@ -22,6 +22,8 @@ export interface JournalRecord {
   tokens: bigint;
   fee: bigint;
   blockNumber: bigint;
+  /** The `execute` caller's `correlationId` (the autopilot's trade id); absent on manual trades. */
+  correlationId?: string;
 }
 
 /** `<home>/meme/journal.jsonl`. */
