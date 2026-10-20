@@ -3,7 +3,7 @@ import { parseArgs } from "node:util";
 import { resolveToken } from "@0xwh1sker/mantle-meme-sdk";
 import { type LocalAccount, parseUnits } from "viem";
 import { mnemonicToAccount } from "viem/accounts";
-import { MarketSim, type SimEvent, type Wallet } from "./sim.js";
+import { errorMessage, MarketSim, type SimEvent, type Wallet } from "./sim.js";
 
 export const RPC_ENV = "MARKET_SIM_RPC_URL";
 export const MNEMONIC_ENV = "MARKET_SIM_MNEMONIC";
@@ -143,7 +143,7 @@ export async function main(argv: string[], env: NodeJS.ProcessEnv = process.env)
   } catch (e) {
     const usage =
       e instanceof UsageError || (e as { code?: string }).code?.startsWith("ERR_PARSE_ARGS");
-    process.stderr.write(`market-sim: ${(e as Error).message.split("\n")[0]}\n`);
+    process.stderr.write(`market-sim: ${errorMessage(e)}\n`);
     if (usage) process.stderr.write(USAGE);
     return usage ? 2 : 1;
   }

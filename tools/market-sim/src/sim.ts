@@ -17,11 +17,14 @@ import {
   scanTokens,
   sellCall,
   simulateBuy,
+  toMemeError,
 } from "@0xwh1sker/mantle-meme-sdk";
 import {
   type Address,
+  BaseError,
   type Chain,
   type Client,
+  ContractFunctionRevertedError,
   createWalletClient,
   encodeFunctionData,
   erc20Abi,
@@ -134,6 +137,18 @@ const WORDS = [
   "Shiba",
   "Turbo",
 ];
+
+/** One line for an error: the meme error, or viem's short message plus the custom error name. */
+export function errorMessage(error: unknown): string {
+  const e = toMemeError(error);
+  if (e instanceof BaseError) {
+    const reverted = e.walk((x) => x instanceof ContractFunctionRevertedError);
+    const name =
+      reverted instanceof ContractFunctionRevertedError ? reverted.data?.errorName : undefined;
+    return name ? `${e.shortMessage} (${name})` : e.shortMessage;
+  }
+  return e instanceof Error ? (e.message.split("\n")[0] ?? e.name) : String(e);
+}
 
 /** Deterministic PRNG (mulberry32): the same seed replays the same choices. */
 export function rng(seed: number): () => number {
@@ -511,7 +526,7 @@ export class MarketSim {
           this.emit({
             kind: "error",
             action: create ? "create" : "trade",
-            message: (e as Error).message.split("\n")[0] ?? String(e),
+            message: errorMessage(e),
           });
         }
         const wait = Math.min(between(tMin, tMax), Math.max(0, nextCreate - Date.now()));

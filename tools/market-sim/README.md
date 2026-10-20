@@ -29,7 +29,9 @@ Funding (N keys, no funder key):
 ## Commands
 
 Every command prints one JSON line per event (`create`, `mint`, `buy`, `sell`, `pump`, `skip`,
-`error`; amounts in base units as strings).
+`error`; amounts in base units as strings). A pump prints its `buy` and then a `pump` line with
+the prices before and after. Failures go to stderr as one line (a launchpad revert by name, e.g.
+`Curve completed; …`).
 
 | Command | What it does |
 |---|---|

@@ -8,7 +8,7 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { mantleSepoliaTestnet } from "viem/chains";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startFork } from "../../../e2e/launchpad/fork.js";
-import { MarketSim, mUSD, type SimEvent } from "../src/sim.js";
+import { errorMessage, MarketSim, mUSD, type SimEvent } from "../src/sim.js";
 
 const rpcUrl = process.env.MANTLE_SEPOLIA_RPC_URL;
 const LAUNCH_PRICE = priceE18({
@@ -100,6 +100,9 @@ describe.skipIf(!rpcUrl)("market-sim on a Mantle Sepolia fork", { timeout: 120_0
     const s = await state(token);
     expect(s.status).toBe("completed");
     expect(s.sold).toBe(DESIGN_CURVE_PARAMS.curveSupply);
+    // Trading is over: the next buy fails with a readable reason.
+    const next = await sim.buy(token, mUSD, { wallet: 1 }).catch((e: unknown) => e);
+    expect(errorMessage(next)).toMatch(/^Curve completed/);
   });
 
   it("run: the schedule creates and trades with no errors, then stops on abort", async () => {
