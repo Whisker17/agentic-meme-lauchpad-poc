@@ -48,6 +48,7 @@ import {
   StrategyError,
   sellCall,
   watch,
+  withSendLock,
 } from "@0xwh1sker/mantle-meme-sdk";
 import { type Address, type Client, erc20Abi, getAddress, type Hex, isAddressEqual } from "viem";
 import { getBlock, getBlockNumber, readContract } from "viem/actions";
@@ -451,6 +452,28 @@ export async function runDaemon(ctx: AutopilotContext, strategyFile: string): Pr
   }
 }
 
+/**
+ * Takes the pid file for `pid`: a second daemon racing this one loses with exit 44. Checking the
+ * holder, removing a stale file and creating ours are one critical section under the send lock
+ * (held for that instant only), so two contenders never both reclaim the same stale file.
+ */
+export async function acquirePid(
+  home: string,
+  pid: number,
+  isAlive: (pid: number) => boolean | Promise<boolean> = alive,
+): Promise<void> {
+  const f = autopilotFiles(home);
+  mkdirSync(f.dir, { recursive: true, mode: 0o700 });
+  await withSendLock(home, async () => {
+    const holder = Number(readText(f.pid)?.trim());
+    if (Number.isInteger(holder) && holder > 0 && (await isAlive(holder))) {
+      throw new AutopilotStateError(`Autopilot is already running (pid ${holder})`);
+    }
+    rmSync(f.pid, { force: true });
+    writeFileSync(f.pid, String(pid), { flag: "wx", mode: 0o600 });
+  });
+}
+
 async function daemon(
   ctx: AutopilotContext,
   strategyFile: string,
@@ -462,18 +485,7 @@ async function daemon(
   const pollMs = envMs(ctx.env, POLL_ENV, 2_000);
   mkdirSync(f.dir, { recursive: true, mode: 0o700 });
 
-  // The pid file, exclusively: a second daemon racing this one loses with exit 44.
-  for (;;) {
-    try {
-      writeFileSync(f.pid, String(process.pid), { flag: "wx", mode: 0o600 });
-      break;
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
-      const pid = runningPid(ctx.home);
-      if (pid) throw new AutopilotStateError(`Autopilot is already running (pid ${pid})`);
-      rmSync(f.pid, { force: true });
-    }
-  }
+  await acquirePid(ctx.home, process.pid);
   const ownsPid = () => readText(f.pid)?.trim() === String(process.pid);
 
   const stop = new AbortController();
