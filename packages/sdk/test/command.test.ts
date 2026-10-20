@@ -1,7 +1,16 @@
 // Command-mode building blocks without a chain: the watcher against a lagging RPC, the journal and
 // cost basis, the revert → meme error mapping, SPONSOR_BUSY backoff and the cross-process send lock.
 import { execFile, spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -298,6 +307,33 @@ describe("journal", () => {
     expect(journalPath(home)).toBe(join(home, "meme", "journal.jsonl"));
     expect(readJournal(home)).toEqual(records);
   });
+
+  it("a last line cut short by a crash is read past and repaired by the next append", () => {
+    const home = mkdtempSync(join(tmpdir(), "meme-journal-"));
+    const [a, b, c] = [rec("buy", 100n, 10n), rec("sell", 50n, 4n), rec("buy", 7n, 1n)];
+    appendJournal(home, [a]);
+    appendFileSync(journalPath(home), '{"keyHash":');
+    expect(readJournal(home)).toEqual([a]);
+    appendJournal(home, [b]);
+    expect(readJournal(home)).toEqual([a, b]);
+    expect(readFileSync(journalPath(home), "utf8")).not.toContain('{"keyHash":{');
+
+    // A complete record whose newline was lost is kept, and the next one starts on its own line.
+    const line = readFileSync(journalPath(home), "utf8").trimEnd().split("\n").at(-1) as string;
+    appendFileSync(journalPath(home), line);
+    expect(readJournal(home)).toEqual([a, b, b]);
+    appendJournal(home, [c]);
+    expect(readJournal(home)).toEqual([a, b, b, c]);
+  });
+
+  it("corruption before the last line still throws", () => {
+    const home = mkdtempSync(join(tmpdir(), "meme-journal-"));
+    appendJournal(home, [rec("buy", 100n, 10n)]);
+    appendFileSync(journalPath(home), '{"keyHash":\n');
+    expect(() => readJournal(home)).toThrow();
+    appendJournal(home, [rec("buy", 7n, 1n)]);
+    expect(() => readJournal(home)).toThrow();
+  });
 });
 
 describe("toMemeError", () => {
@@ -371,23 +407,19 @@ describe("send lock", () => {
   const child = fileURLToPath(new URL("./fixtures/locked-request.ts", import.meta.url));
   const hooks = fileURLToPath(new URL("./fixtures/node-ts.mjs", import.meta.url));
   const run = (home: string, url: string) =>
-    promisify(execFile)(process.execPath, [
-      "--experimental-transform-types",
-      "--no-warnings",
-      "--import",
-      hooks,
-      child,
-      home,
-      url,
-    ]);
+    promisify(execFile)(
+      process.execPath,
+      ["--experimental-transform-types", "--no-warnings", "--import", hooks, child, home, url],
+      { timeout: 20_000 },
+    );
 
-  it("serialises two OS processes sending for one account: neither sees SPONSOR_BUSY", async () => {
-    // A sponsor with one in-flight request per account, each taking 400 ms.
+  /** A sponsor with one in-flight request per account, each taking 400 ms; counts refusals. */
+  async function sponsor() {
+    const s = { url: "", busy: 0, close: () => {} };
     let inFlight = 0;
-    let busy = 0;
     const server = createServer(async (_req, res) => {
       if (inFlight > 0) {
-        busy++;
+        s.busy++;
         res.end("SPONSOR_BUSY");
         return;
       }
@@ -397,18 +429,24 @@ describe("send lock", () => {
       res.end("ok");
     });
     await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
-    const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    s.url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    s.close = () => server.close();
+    return s;
+  }
+
+  it("serialises two OS processes sending for one account: neither sees SPONSOR_BUSY", async () => {
+    const s = await sponsor();
     try {
       const home = mkdtempSync(join(tmpdir(), "meme-lock-"));
-      const answers = await Promise.all([run(home, url), run(home, url)]);
+      const answers = await Promise.all([run(home, s.url), run(home, s.url)]);
       expect(answers.map((a) => a.stdout)).toEqual(["ok", "ok"]);
-      expect(busy).toBe(0);
+      expect(s.busy).toBe(0);
 
       // Control: the same two requests without the lock collide.
-      await Promise.all([fetch(url, { method: "POST" }), sleep(50).then(() => fetch(url))]);
-      expect(busy).toBe(1);
+      await Promise.all([fetch(s.url, { method: "POST" }), sleep(50).then(() => fetch(s.url))]);
+      expect(s.busy).toBe(1);
     } finally {
-      server.close();
+      s.close();
     }
   }, 30_000);
 
@@ -428,4 +466,41 @@ describe("send lock", () => {
     ).rejects.toThrow(/send\.lock/);
     rmSync(lock);
   });
+
+  /** A lock file with `content`, last written `age` ms ago. */
+  const leftLock = (home: string, content: string, age: number) => {
+    const lock = join(home, "meme", "send.lock");
+    mkdirSync(join(home, "meme"), { recursive: true });
+    writeFileSync(lock, content);
+    const t = (Date.now() - age) / 1000;
+    utimesSync(lock, t, t);
+    return lock;
+  };
+
+  it("breaks an empty or garbage lock older than 10 s (a creator that died before its pid), never a fresh one", async () => {
+    const home = mkdtempSync(join(tmpdir(), "meme-lock-"));
+    const quick = { timeoutMs: 300, retryMs: 20 };
+    for (const content of ["", "garbage", "12x"]) {
+      const lock = leftLock(home, content, 11_000);
+      expect(await withSendLock(home, async () => "ran", quick)).toBe("ran");
+      expect(existsSync(lock)).toBe(false);
+    }
+    // A creator between its exclusive create and its pid write is not robbed.
+    const lock = leftLock(home, "", 5_000);
+    await expect(withSendLock(home, async () => "ran", quick)).rejects.toThrow(/send\.lock/);
+    expect(readFileSync(lock, "utf8")).toBe("");
+  });
+
+  it("two OS processes recovering one empty crash-left lock hold it one at a time", async () => {
+    const s = await sponsor();
+    try {
+      const home = mkdtempSync(join(tmpdir(), "meme-lock-"));
+      leftLock(home, "", 11_000);
+      const answers = await Promise.all([run(home, s.url), run(home, s.url)]);
+      expect(answers.map((a) => a.stdout)).toEqual(["ok", "ok"]);
+      expect(s.busy).toBe(0);
+    } finally {
+      s.close();
+    }
+  }, 30_000);
 });

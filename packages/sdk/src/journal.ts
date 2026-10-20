@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, truncateSync } from "node:fs";
 import { join } from "node:path";
 import {
   type Address,
@@ -53,17 +53,53 @@ export function tradesOf(
 
 const BIGINTS = ["quotePulled", "tokens", "fee", "blockNumber"] as const;
 
-/** Appends records, one JSON line each (amounts as decimal strings). */
+function parseRecord(line: string): JournalRecord {
+  const r = JSON.parse(line);
+  for (const k of BIGINTS) r[k] = BigInt(r[k]);
+  return r as JournalRecord;
+}
+
+/** Whether `line`, the journal's unterminated last line, is a whole record (only its newline lost). */
+function whole(line: string): boolean {
+  try {
+    parseRecord(line);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Appends records, one JSON line each (amounts as decimal strings). Called under the send lock, so
+ * no other append runs: a last line a crash cut short is first dropped (or, when only its newline
+ * was lost, terminated), so a record is never written onto it.
+ */
 export function appendJournal(home: string, records: readonly JournalRecord[]): void {
   if (records.length === 0) return;
   mkdirSync(memeDir(home), { recursive: true, mode: 0o700 });
+  const file = journalPath(home);
+  let lead = "";
+  try {
+    const text = readFileSync(file);
+    const end = text.lastIndexOf("\n") + 1;
+    if (end < text.length) {
+      if (whole(text.subarray(end).toString("utf8"))) lead = "\n";
+      else truncateSync(file, end);
+    }
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+  }
   const lines = records.map((r) =>
     JSON.stringify(r, (_, v) => (typeof v === "bigint" ? v.toString() : v)),
   );
-  appendFileSync(journalPath(home), `${lines.join("\n")}\n`, { mode: 0o600 });
+  appendFileSync(file, `${lead}${lines.join("\n")}\n`, { mode: 0o600 });
 }
 
-/** Every record of the journal; none when it does not exist. */
+/**
+ * Every record of the journal; none when it does not exist. An unterminated last line that is not
+ * a whole record was cut short by a crash (or is being appended) and is skipped: that history is
+ * unknown, so its cost basis reads as `null` (DESIGN §12). Corruption anywhere else throws.
+ */
 export function readJournal(home: string): JournalRecord[] {
   let text: string;
   try {
@@ -72,14 +108,10 @@ export function readJournal(home: string): JournalRecord[] {
     if ((e as NodeJS.ErrnoException).code === "ENOENT") return [];
     throw e;
   }
-  return text
-    .split("\n")
-    .filter((line) => line.trim() !== "")
-    .map((line) => {
-      const r = JSON.parse(line);
-      for (const k of BIGINTS) r[k] = BigInt(r[k]);
-      return r as JournalRecord;
-    });
+  const lines = text.split("\n");
+  const last = lines.pop() as string;
+  if (whole(last)) lines.push(last);
+  return lines.filter((line) => line.trim() !== "").map(parseRecord);
 }
 
 /**
