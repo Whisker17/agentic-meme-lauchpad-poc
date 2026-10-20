@@ -18,7 +18,11 @@ import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { ExecutionRevertedError, SponsorBusyError } from "@0xwh1sker/mantle-aa-sdk";
+import {
+  type AgentSession,
+  ExecutionRevertedError,
+  SponsorBusyError,
+} from "@0xwh1sker/mantle-aa-sdk";
 import {
   type Address,
   createClient,
@@ -39,6 +43,7 @@ import {
   CurveCompletedError,
   CurveModelError,
   costBasis,
+  execute,
   InsufficientBalanceError,
   type JournalRecord,
   journalPath,
@@ -377,6 +382,51 @@ describe("toMemeError", () => {
     ]) {
       expect(toMemeError(e)).toBe(e);
     }
+  });
+});
+
+describe("execute", () => {
+  it("a reverted receipt is ExecutionRevertedError with its hash, though the executor reported success; nothing is journalled", async () => {
+    const hash = keccak256("0xbad");
+    // As the published AgentSession.exec resolves when the executor (the sponsor's word) says success.
+    const session = {
+      account: ME,
+      keyHash: KEY,
+      exec: async () => ({ hash, success: true }),
+    } as unknown as AgentSession;
+    // The chain's receipt says reverted. Its Trade log is never on chain; it shows nothing is parsed.
+    const receipt = {
+      transactionHash: hash,
+      transactionIndex: "0x0",
+      blockHash: keccak256("0x2a"),
+      blockNumber: "0x2a",
+      from: OTHER,
+      to: ME,
+      contractAddress: null,
+      cumulativeGasUsed: "0x1",
+      gasUsed: "0x1",
+      effectiveGasPrice: "0x1",
+      logsBloom: `0x${"00".repeat(256)}`,
+      logs: [tradeLog({ block: 42n, logIndex: 0, tx: hash })],
+      status: "0x0",
+      type: "0x2",
+    };
+    const client = createClient({
+      transport: custom({
+        async request({ method }) {
+          if (method === "eth_getTransactionReceipt") return receipt;
+          throw new Error(`unexpected ${method}`);
+        },
+      }),
+    });
+    const home = mkdtempSync(join(tmpdir(), "meme-execute-"));
+    const calls = [{ to: OTHER, data: "0x" as Hex, value: 0n }];
+    const err = await execute({ session, client, home, launchpad: PAD, calls }).catch(
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(ExecutionRevertedError);
+    expect((err as ExecutionRevertedError).message).toContain(hash);
+    expect(readJournal(home)).toEqual([]);
   });
 });
 

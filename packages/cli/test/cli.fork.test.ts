@@ -6,6 +6,8 @@
 // Skipped only when MANTLE_SEPOLIA_RPC_URL is unset; CI sets it and fails on a skip.
 import { spawn } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync } from "node:fs";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
@@ -46,6 +48,7 @@ import {
   parseUnits,
   type TransactionReceipt,
   toHex,
+  zeroHash,
 } from "viem";
 import { generatePrivateKey, mnemonicToAccount, privateKeyToAddress } from "viem/accounts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -628,6 +631,53 @@ describe.skipIf(!rpcUrl)(
       const limit = fails(await meme("buy", SYMBOL, "--amount", over), "buy", 11, "LIMIT_EXCEEDED");
       expect(limit).toMatchObject({ remaining: remaining.toString() });
       expect(readJournal(agentHome)).toHaveLength(journal);
+    });
+
+    it("a sponsor reporting success for a reverted transaction is exit 30, not a trade", async () => {
+      // A transaction that reverted on chain: the market buys a token that is not registered.
+      const wallet = createWalletClient({
+        account: MARKET,
+        chain: mantleSepolia,
+        transport: http(forkUrl),
+      });
+      const order = { amount: 1n, minOut: 0n, deadline: maxUint256, recipient: MARKET.address };
+      const reverted = await wallet.sendTransaction({
+        ...buyCall(PAD, { ...order, token: USD }),
+        gas: 300_000n,
+      });
+      expect((await receipt(reverted)).status).toBe("reverted");
+      // The sponsor is not trusted: this one answers every relay "success" with that hash.
+      const liar = createServer(async (req, res) => {
+        let body = "";
+        for await (const chunk of req) body += chunk;
+        res.setHeader("content-type", "application/json");
+        const request = body ? JSON.parse(body) : undefined;
+        if (request?.method === "sponsor_relay") {
+          const result = { status: "success", batchDigest: zeroHash, hash: reverted };
+          res.end(JSON.stringify({ jsonrpc: "2.0", id: request.id, result }));
+          return;
+        }
+        const upstream = await fetch(
+          `${sponsor?.url}${req.url}`,
+          body ? { method: "POST", headers: { "content-type": "application/json" }, body } : {},
+        );
+        res.statusCode = upstream.status;
+        res.end(await upstream.text());
+      });
+      await new Promise<void>((r) => liar.listen(0, "127.0.0.1", r));
+      try {
+        const journal = readJournal(agentHome).length;
+        const inventory = await hookRead("inventory", token);
+        const r = await mantleMeme(["buy", SYMBOL, "--amount", "1", "--json"], {
+          ...agentEnv,
+          MANTLE_AA_SPONSOR_URL: `http://127.0.0.1:${(liar.address() as AddressInfo).port}`,
+        });
+        expect(fails(r, "buy", 30, "EXECUTION_REVERTED").message).toContain(reverted);
+        expect(readJournal(agentHome)).toHaveLength(journal);
+        expect(await hookRead("inventory", token)).toBe(inventory);
+      } finally {
+        liar.close();
+      }
     });
 
     it("sell --all empties the session's inventory", async () => {
