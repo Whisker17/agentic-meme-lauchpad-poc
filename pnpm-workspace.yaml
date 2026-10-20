@@ -3,3 +3,4 @@ packages:
   - "tools/*"
 minimumReleaseAgeExclude:
   - '@0xwh1sker/mantle-aa-sdk@0.1.4'
+  - '@0xwh1sker/mantle-aa-sponsor@0.1.4'
