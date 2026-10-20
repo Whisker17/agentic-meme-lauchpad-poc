@@ -166,5 +166,5 @@ describe("loadDeployments", () => {
 });
 
 it("exports its version", () => {
-  expect(VERSION).toBe("0.1.1");
+  expect(VERSION).toBe("0.1.2");
 });
