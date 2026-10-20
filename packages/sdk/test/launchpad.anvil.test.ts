@@ -142,7 +142,7 @@ const randText = (r: () => number) => {
   ).join("");
 };
 
-describe("on anvil", () => {
+describe("on anvil", { timeout: 120_000 }, () => {
   it("readCurveParams returns the deployed immutables", async () => {
     expect(await readCurveParams(users[0] as TestWallet, launchpad)).toEqual(DESIGN_CURVE_PARAMS);
   });
@@ -270,7 +270,7 @@ describe("on anvil", () => {
       await expect(quoteSell(trader, launchpad, token, 1n).catch(revertName)).resolves.toBe(
         "CurveAlreadyCompleted",
       );
-    }, 120_000);
+    });
   }
 
   it("a clamped completing buy pulls exactly amountInUsed and leaves no allowance", async () => {

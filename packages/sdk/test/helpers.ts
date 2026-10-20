@@ -90,6 +90,8 @@ export function walletClient(url: string, key: Hex): TestWallet {
     account: privateKeyToAccount(key),
     chain: foundry,
     transport: http(url),
+    // anvil mines right after accepting a transaction; poll receipts fast (viem default: 4 s).
+    pollingInterval: 20,
   }).extend(publicActions);
 }
 
