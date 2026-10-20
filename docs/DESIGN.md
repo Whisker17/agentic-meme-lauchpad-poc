@@ -401,7 +401,9 @@ iteration means a new launchpad version; tokens completed on v1 are not migrated
   (re-scan a 5-block overlap).
 - **Journal** `<agentHome>/meme/journal.jsonl`: one record per confirmed submission of this
   session `{keyHash, txHash, token, side, quotePulled, tokens, fee, blockNumber}`, amounts taken
-  from that transaction's own `Trade` logs in the receipt. It is the **only** source of cost
+  from that transaction's own `Trade` logs in the receipt. (fixed 0.1.2 review) An optional
+  `correlationId`, given to `execute` by the caller (the autopilot's trade id), is written into that
+  transaction's records; manual trades carry none, and records without it read as before. It is the **only** source of cost
   basis; there is no historical event scan by account (the `Trade` event cannot tell two
   sessions of one account apart).
   (fixed 0.1.1 review) A crash mid-append can leave a torn last line without its newline. Reading
@@ -651,14 +653,17 @@ fractional. The 10 s tick and the 2 s watcher poll are configurable (§6.1).
   Only positions the autopilot opened are managed (sold from the session's inventory of that
   token); a restart manages the open positions of the previous run's `state.json` again.
   (fixed 0.1.2 review) A trade's outcome reaches `state.json` before anything else can fail. The
-  daemon checkpoints each autopilot trade as `pending` (token, buy / take-profit / max hold, the
-  journal's record count) before the send. As soon as `execute` confirms, the trade is applied
+  daemon checkpoints each autopilot trade as `pending` (token, buy / take-profit / max hold, a
+  unique trade id) before the send, and `execute` writes that id into the trade's journal records
+  (`correlationId`). As soon as `execute` confirms, the trade is applied
   (a buy opens its position, a take-profit sets `takeProfitDone`, a max hold closes it) and
   checkpointed. A position records its buy's block (`openedBlock`). `openedAt`, that block's
   chain time, is read when the position is next evaluated: until a read succeeds it is `null`, and
   the failed step is retried. The state is checkpointed after every action. A start applies a
-  `pending` trade of a daemon that died before the checkpoint from the journal (D33): that is the
-  session's record for that token and side that was appended after the count. Measured on the fork
+  `pending` trade of a daemon that died before the checkpoint from the journal (D33): only the
+  record carrying that trade's id. A same-session manual trade of the same token and side carries
+  no id and is never taken for it, so a trade that never confirmed opens, marks or closes nothing
+  (`packages/cli/test/autopilot.recovery.test.ts`). Measured on the fork
   (`packages/cli/test/autopilot.recovery.fork.test.ts`) with every block read by number failing
   after a buy, and with the daemon killed right after a confirmed buy and after a confirmed
   take-profit. In each case the restarted daemon managed the position once and sold it later, and
