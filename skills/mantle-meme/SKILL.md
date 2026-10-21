@@ -178,6 +178,8 @@ Say honestly when you restate it:
 
 If `autopilot start` fails with "did not report within 120 s", the daemon may still come up (it
 can wait for a trade in flight): run `autopilot status` before anything else, never start twice.
+If the daemon stops right after it started (`autopilot status` not running, a `stopped` event in
+`autopilot log`), report that with the log and stop: start it again only after a new yes.
 
 Reporting: `autopilot log --since <duration> --json` events are `started`, `stopped` (`reason`),
 `bought` (`symbol, spent, tokens, explorer`), `sold` (`reason` `take_profit` / `max_hold`, `received,

@@ -16,9 +16,18 @@
 //                  environment (MANTLE_AA_*, PATH with the recording `mantle-meme`) and prints the
 //                  reply on stdout (plain text, or a JSON envelope with `final` / `payloads`).
 //                  Default: OpenClaw's embedded agent (see README.md).
+//   DRY_RUN_SETUP, DRY_RUN_TEARDOWN  optional shell commands run once after the human's setup
+//                  (with the turn's environment plus $DRY_RUN_AGENT_HOME) and once at the end,
+//                  e.g. to start and remove the OpenClaw container; with a teardown, it alone stops
+//                  the autopilot daemon.
+//   DRY_RUN_HOST   the host name the agent reaches this machine at (default 127.0.0.1; in Docker
+//                  host.docker.internal): the agent's RPC and sponsor URLs use it.
+//   DRY_RUN_CLI    the built `mantle-meme.js` as the agent sees it (default: this checkout's)
 //   DRY_RUN_DIR    homes, sponsor, logs and the transcript (default under $TMPDIR)
 //
-// The commands the agent ran are recorded by a `mantle-meme` shim first on its PATH.
+// The commands the agent ran are recorded by a `mantle-meme` shim in <agent home>/.dry-run, put
+// first on the agent's PATH. Where the agent's shell resets PATH (OpenClaw in Docker), the setup
+// links the agent's `mantle-meme` to it instead (README.md).
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import {
@@ -49,28 +58,13 @@ const workspace = join(dir, "workspace");
 mkdirSync(workspace, { recursive: true });
 const log = (line: string) => appendFileSync(join(dir, "run.log"), `${line}\n`);
 
-// The recording shim: runs the built CLI and appends {argv, exitCode, stdout} per call.
-const bin = join(dir, "bin");
-const commands = join(dir, "commands.jsonl");
-mkdirSync(bin, { recursive: true });
-writeFileSync(
-  join(bin, "mantle-meme"),
-  `#!${process.execPath}
-const { spawnSync } = require("node:child_process");
-const { appendFileSync } = require("node:fs");
-const argv = process.argv.slice(2);
-const r = spawnSync(process.execPath, [${JSON.stringify(join(repo, "packages/cli/dist/bin/mantle-meme.js"))}, ...argv], { stdio: ["inherit", "pipe", "pipe"], encoding: "utf8", maxBuffer: 1 << 26 });
-process.stdout.write(r.stdout ?? ""); process.stderr.write(r.stderr ?? "");
-appendFileSync(${JSON.stringify(commands)}, JSON.stringify({ argv, exitCode: r.status, stdout: r.stdout }) + "\\n");
-process.exit(r.status ?? 1);
-`,
-);
-chmodSync(join(bin, "mantle-meme"), 0o755);
-writeFileSync(join(bin, "package.json"), '{"type":"commonjs"}');
+const cli = process.env.DRY_RUN_CLI ?? join(repo, "packages/cli/dist/bin/mantle-meme.js");
+const host = process.env.DRY_RUN_HOST ?? "127.0.0.1";
 
 const DEFAULT_AGENT =
   'openclaw agent --local --session-id "$DRY_RUN_SESSION" --message "$DRY_RUN_MESSAGE" --json';
 const agentCmd = process.env.DRY_RUN_AGENT ?? DEFAULT_AGENT;
+const { DRY_RUN_SETUP: setupCmd, DRY_RUN_TEARDOWN: teardownCmd } = process.env;
 
 const fork = await startFork(upstream);
 const keys = [0, 1, 2].map(() => generatePrivateKey());
@@ -109,6 +103,63 @@ interface Turn {
   reply: string;
   checks: [string, boolean][];
 }
+// The recording shim: runs the built CLI and appends {argv, exitCode, stdout} per call. Written
+// into the agent home once `session export` has created it, so a container mounting that home sees it.
+const bin = join(a.agentHome, ".dry-run");
+const commands = join(bin, "commands.jsonl");
+function writeShim() {
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(
+    join(bin, "mantle-meme"),
+    `#!/usr/bin/env node
+const { spawnSync } = require("node:child_process");
+const { appendFileSync } = require("node:fs");
+const argv = process.argv.slice(2);
+const r = spawnSync(process.execPath, [${JSON.stringify(cli)}, ...argv], { stdio: ["inherit", "pipe", "pipe"], encoding: "utf8", maxBuffer: 1 << 26 });
+process.stdout.write(r.stdout ?? ""); process.stderr.write(r.stderr ?? "");
+appendFileSync(require("node:path").join(__dirname, "commands.jsonl"), JSON.stringify({ argv, exitCode: r.status, stdout: r.stdout }) + "\\n");
+process.exit(r.status ?? 1);
+`,
+  );
+  chmodSync(join(bin, "mantle-meme"), 0o755);
+  writeFileSync(join(bin, "package.json"), '{"type":"commonjs"}');
+}
+
+/** Runs a shell command with the agent's environment (async: the flow's proxies run in-process). */
+function sh(cmd: string, extra: Record<string, string> = {}) {
+  // The agent home and its password, the agent RPC and the sponsor (set by `a.start()`).
+  const agentEnv = Object.fromEntries(
+    Object.entries((a as unknown as { agentEnv: Record<string, string> }).agentEnv).map(
+      ([k, v]) => [k, v.replace("//127.0.0.1:", `//${host}:`)],
+    ),
+  );
+  return new Promise<{ status: number; stdout: string; stderr: string }>((done) =>
+    execFile(
+      "sh",
+      ["-c", cmd],
+      {
+        cwd: workspace,
+        maxBuffer: 1 << 26,
+        timeout: 900_000,
+        env: {
+          ...process.env,
+          ...agentEnv,
+          MANTLE_MEME_AUTOPILOT_TICK_MS: "1000",
+          MANTLE_MEME_AUTOPILOT_POLL_MS: "500",
+          PATH: `${bin}:${process.env.PATH}`,
+          DRY_RUN_SESSION: `mantle-meme-dry-run-${a.tag}`,
+          DRY_RUN_WORKSPACE: workspace,
+          DRY_RUN_SKILLS: resolve(here, "../.."),
+          DRY_RUN_AGENT_HOME: a.agentHome,
+          ...extra,
+        },
+      },
+      (e, stdout, stderr) =>
+        done({ status: e ? (typeof e.code === "number" ? e.code : 1) : 0, stdout, stderr }),
+    ),
+  );
+}
+
 const turns: Turn[] = [];
 const notes: string[] = [];
 let seen = 0;
@@ -134,31 +185,8 @@ function replyText(out: string): string {
 
 /** One agent turn. Asynchronous: the flow's RPC and sponsor proxies run in this process. */
 async function turn(step: string, message: string, checks: (c: Cmd[]) => [string, boolean][]) {
-  const r = await new Promise<{ status: number; stdout: string; stderr: string }>((done) =>
-    execFile(
-      "sh",
-      ["-c", agentCmd],
-      {
-        cwd: workspace,
-        maxBuffer: 1 << 26,
-        timeout: 900_000,
-        env: {
-          ...process.env,
-          // The agent home and its password, the agent RPC and the sponsor (set by `a.start()`).
-          ...(a as unknown as { agentEnv: Record<string, string> }).agentEnv,
-          MANTLE_MEME_AUTOPILOT_TICK_MS: "1000",
-          MANTLE_MEME_AUTOPILOT_POLL_MS: "500",
-          PATH: `${bin}:${process.env.PATH}`,
-          DRY_RUN_MESSAGE: message,
-          DRY_RUN_SESSION: `mantle-meme-dry-run-${a.tag}`,
-          DRY_RUN_WORKSPACE: workspace,
-          DRY_RUN_SKILLS: resolve(here, "../.."),
-        },
-      },
-      (e, stdout, stderr) =>
-        done({ status: e ? (typeof e.code === "number" ? e.code : 1) : 0, stdout, stderr }),
-    ),
-  );
+  const running = existsSync(pidFile());
+  const r = await sh(agentCmd, { DRY_RUN_MESSAGE: message });
   const cmds = readCommands();
   const t: Turn = {
     step,
@@ -168,6 +196,7 @@ async function turn(step: string, message: string, checks: (c: Cmd[]) => [string
     checks: checks(cmds),
   };
   if (r.status !== 0) t.checks.push([`agent turn exit ${r.status}`, false]);
+  if (running) t.checks.push(["autopilot daemon still running after the turn", await ticking()]);
   turns.push(t);
   log(`turn ${step}: ${cmds.map((c) => c.argv.join(" ")).join(" | ")}`);
 }
@@ -176,6 +205,24 @@ const has = (c: Cmd[], ...words: string[]) => c.some((x) => words.every((w) => x
 const ok = (c: Cmd[], ...words: string[]) =>
   c.some((x) => words.every((w) => x.argv.includes(w)) && x.exitCode === 0);
 const pidFile = () => join(a.agentHome, "meme", "autopilot", "pid");
+/** The daemon checkpoints state.json every step: running if it does so after now. */
+async function ticking() {
+  const since = Date.now();
+  return until(
+    () => {
+      try {
+        const s = JSON.parse(
+          readFileSync(join(a.agentHome, "meme", "autopilot", "state.json"), "utf8"),
+        );
+        return s.status === "running" && Date.parse(s.updatedAt) > since ? true : undefined;
+      } catch {
+        return undefined; // not written yet, or mid-write
+      }
+    },
+    "the daemon's checkpoint",
+    15_000,
+  ).catch(() => false);
+}
 /** Nothing that sends: no trade, create, claim or autopilot start. */
 const sentNothing = (c: Cmd[]) =>
   !c.some(
@@ -199,6 +246,11 @@ try {
   await a.start();
   await runStep(a, STEPS[0] as (typeof STEPS)[0]); // §9.2 step 1: the human's setup
   notes.push(`Human setup done (policy: 16 mUSD total and per day; 16 mUSD minted).`);
+  writeShim();
+  if (setupCmd) {
+    const r = await sh(setupCmd);
+    assert.equal(r.status, 0, `DRY_RUN_SETUP: ${a.scrub(r.stderr)}`);
+  }
   const symbol = `PEPE${a.tag}`;
 
   await turn("2", "我有多少钱、额度还剩多少", (c) => [
@@ -231,27 +283,34 @@ try {
       ]);
   }
 
-  // §9.2 step 5: market-sim launches a token; the autopilot buys it.
-  const launched = await a.sim.createToken({ wallet: 1 });
-  const bought = await until(
-    () =>
-      readEvents(a.agentHome).find(
-        (e) => e.event === "bought" && getAddress(e.token as string) === getAddress(launched.token),
-      ),
-    "the autopilot's bought event",
-  );
-  notes.push(
-    `Step 5: market-sim created ${launched.symbol}; autopilot event: \`${JSON.stringify(bought)}\``,
-  );
-  // §9.2 step 6: pump → take-profit.
-  const pump = await a.sim.pump(launched.token, { wallet: 2 });
-  const sold = await until(
-    () => readEvents(a.agentHome).find((e) => e.event === "sold" && e.reason === "take_profit"),
-    "the autopilot's take-profit sold event",
-  );
-  notes.push(
-    `Step 6: market-sim pump +${pump.percent}% of ${launched.symbol}; autopilot event: \`${JSON.stringify(sold)}\``,
-  );
+  // §9.2 steps 5–6 need the daemon; without it the agent's reporting and steps 7–8 still run.
+  try {
+    // §9.2 step 5: market-sim launches a token; the autopilot buys it.
+    const launched = await a.sim.createToken({ wallet: 1 });
+    const bought = await until(
+      () =>
+        readEvents(a.agentHome).find(
+          (e) =>
+            e.event === "bought" && getAddress(e.token as string) === getAddress(launched.token),
+        ),
+      "the autopilot's bought event",
+    );
+    notes.push(
+      `Step 5: market-sim created ${launched.symbol}; autopilot event: \`${JSON.stringify(bought)}\``,
+    );
+    // §9.2 step 6: pump → take-profit.
+    const pump = await a.sim.pump(launched.token, { wallet: 2 });
+    const sold = await until(
+      () => readEvents(a.agentHome).find((e) => e.event === "sold" && e.reason === "take_profit"),
+      "the autopilot's take-profit sold event",
+    );
+    notes.push(
+      `Step 6: market-sim pump +${pump.percent}% of ${launched.symbol}; autopilot event: \`${JSON.stringify(sold)}\``,
+    );
+  } catch (e) {
+    failed = true;
+    notes.push(`Steps 5–6 FAILED: ${(e as Error).message}`);
+  }
   await turn("5–6", "打新情况怎么样？", (c) => [
     [
       "read the autopilot log or status",
@@ -267,8 +326,12 @@ try {
   failed = true;
   notes.push(`ABORTED: ${(e as Error).message}`);
 } finally {
-  // Stop the daemon the agent started (only that pid), then everything the flow started.
-  if (existsSync(pidFile())) {
+  // Stop the daemon the agent started (only that pid, or the teardown does), then everything the
+  // flow started.
+  if (teardownCmd) {
+    const r = await sh(teardownCmd);
+    if (r.status !== 0) notes.push(`DRY_RUN_TEARDOWN exit ${r.status}: ${a.scrub(r.stderr)}`);
+  } else if (existsSync(pidFile())) {
     const pid = Number(readFileSync(pidFile(), "utf8").trim());
     if (pid > 0) {
       try {
