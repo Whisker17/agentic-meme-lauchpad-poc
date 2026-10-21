@@ -1,4 +1,5 @@
-# One long-lived OpenClaw container; agent turns run with `docker exec` (see skills/mantle-meme/README.md).
+# One long-lived OpenClaw container; agent turns run with `docker exec` (see skills/mantle-meme/README.md),
+# or from Telegram through the gateway (scripts/demo-up.sh, docs/demo.md).
 #   docker compose -f docker/openclaw/compose.yaml up -d --build
 # Mounts only the dedicated OpenClaw state, the exported agent home and skills/ (read-only).
 # Never mount ~/.mantle-aa, ~/.openclaw, ~/.ssh or the docker socket.
@@ -9,7 +10,7 @@ services:
     build:
       context: ../..
       dockerfile: docker/openclaw/Dockerfile
-    container_name: mantle-meme-openclaw
+    container_name: ${MANTLE_MEME_CONTAINER:-mantle-meme-openclaw}
     environment:
       MANTLE_AA_HOME: /home/node/.mantle-meme-agent
       # From the caller's environment; URLs must use host.docker.internal, not 127.0.0.1.
@@ -18,6 +19,15 @@ services:
       MANTLE_AA_SPONSOR_URL:
       MANTLE_MEME_TG_BOT_TOKEN:
       MANTLE_MEME_TG_CHAT_ID:
+      MANTLE_MEME_TG_API_URL:
+      # The Telegram channel (scripts/demo-up.sh): with MANTLE_MEME_GATEWAY=1 the launcher also runs
+      # the OpenClaw gateway, which reads the bot token from TELEGRAM_BOT_TOKEN (never from a file).
+      MANTLE_MEME_GATEWAY:
+      TELEGRAM_BOT_TOKEN: ${MANTLE_MEME_TG_BOT_TOKEN:-}
+      # A proxy, where Telegram is reachable only through one (scripts/demo-up.sh).
+      HTTPS_PROXY:
+      NO_PROXY:
+      NODE_USE_ENV_PROXY:
       # Optional daemon timing (the dry run shortens it). The launcher starts the daemon with this
       # container environment, so `docker exec -e` does not reach it.
       MANTLE_MEME_AUTOPILOT_TICK_MS:

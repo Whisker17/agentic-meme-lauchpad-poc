@@ -14,7 +14,9 @@ RUN pnpm install --frozen-lockfile && pnpm build \
  && mantle-meme --help > /dev/null
 
 WORKDIR /app
-# Agent turns run with `docker exec`. OpenClaw's exec tool kills every process a command leaves
-# behind, so the main process is a launcher that runs `autopilot start` for the agent's `mantle-meme`
-# (a wrapper): the daemon is the launcher's descendant, not OpenClaw's (skills/mantle-meme/README.md).
+# Agent turns run with `docker exec`, or in the OpenClaw gateway the launcher also runs when
+# MANTLE_MEME_GATEWAY=1 (the Telegram demo, scripts/demo-up.sh). OpenClaw's exec tool kills every
+# process a command leaves behind, so the main process is a launcher that runs `autopilot start` for
+# the agent's `mantle-meme` (a wrapper): the daemon is the launcher's descendant, not OpenClaw's
+# (skills/mantle-meme/README.md).
 CMD ["node", "/opt/mantle-meme/docker/openclaw/launcher.mjs"]
