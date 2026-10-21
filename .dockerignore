@@ -1,0 +1,17 @@
+**/node_modules
+**/dist
+**/coverage
+**/*.tsbuildinfo
+.git
+.env
+.env.*
+**/*.pem
+**/*.key
+**/keystore
+**/.mantle-aa
+**/*.sqlite*
+**/*.log
+contracts/out
+contracts/cache
+contracts/lib
+contracts/broadcast
