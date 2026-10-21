@@ -31,6 +31,21 @@ function command({ argv, cwd }) {
   ];
 }
 
+// demo-up (scripts/demo-up.sh) sets MANTLE_MEME_GATEWAY=1: the launcher then also runs the OpenClaw
+// gateway (the Telegram channel) as its child, and the container lives as long as the gateway.
+if (process.env.MANTLE_MEME_GATEWAY === "1") {
+  const gateway = spawn(
+    process.execPath,
+    ["openclaw.mjs", "gateway", "--bind", "loopback", "--allow-unconfigured"],
+    {
+      cwd: "/app",
+      stdio: "inherit",
+    },
+  );
+  gateway.on("exit", (code, signal) => process.exit(code ?? 128 + constants.signals[signal]));
+  for (const s of ["SIGTERM", "SIGINT"]) process.on(s, () => gateway.kill(s));
+}
+
 rmSync(SOCKET, { force: true }); // left over by a restarted container
 createServer((sock) => {
   sock.on("error", () => {}); // a caller that goes away must not stop the launcher

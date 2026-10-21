@@ -104,6 +104,14 @@ refused with a usage error (exit 1). The daemon is the launcher's descendant and
 The daemon gets the container's environment, not that of the `docker exec` that runs the turn: set
 optional variables such as `MANTLE_MEME_AUTOPILOT_TICK_MS` when the container starts.
 
+### Telegram
+
+The Telegram demo starts this container with [scripts/demo-up.sh](../../scripts/demo-up.sh), which
+sets `MANTLE_MEME_GATEWAY=1`: the launcher then also runs the OpenClaw gateway (loopback only) with
+the Telegram channel, so turns come from Telegram instead of `docker exec`. The agent's commands
+still reach the launcher, and the daemon still outlives the turn. How to run it:
+[docs/demo.md](../../docs/demo.md).
+
 ## Dry run (fork, no Telegram)
 
 [dry-run/dry-run.ts](dry-run/dry-run.ts) runs DESIGN §9.2 steps 2–8 on an anvil fork of Mantle
