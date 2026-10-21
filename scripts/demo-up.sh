@@ -18,7 +18,8 @@
 #                                ~/.mantle-aa/keys/meme-demo-telegram.env; exported values win)
 #   MANTLE_MEME_AGENT_HOME       the exported agent home (default ~/.mantle-meme-agent)
 #   MANTLE_MEME_OPENCLAW_STATE   OpenClaw's state and model login (default ~/.mantle-meme-openclaw)
-#   DEMO_RPC_URL                 the chain (default https://rpc.sepolia.mantle.xyz)
+#   DEMO_RPC_URL                 the chain (default https://rpc.sepolia.mantle.xyz), reached through
+#                                a local relay on 127.0.0.1:8547 (scripts/rpc-relay.mjs)
 #   DEMO_STATE_DIR               PIDs, logs, the sponsor's config and ledger (default ~/.mantle-meme-demo)
 #   DEMO_SPONSOR_PORT            default 8548
 #   DEMO_CONTAINER               the container's name (default mantle-meme-openclaw)
@@ -49,6 +50,11 @@ die() {
   exit 1
 }
 say() { echo "demo-up: $*"; }
+# A URL of this machine as the container reaches it.
+dockerhost() {
+  local u=${1//127.0.0.1/host.docker.internal}
+  echo "${u//localhost/host.docker.internal}"
+}
 readable() { [ -n "${!1:-}" ] && [ -r "${!1}" ] || die "$1 must name a readable file"; }
 # A PID file whose process is alive and is still the one we started (its command line has $2).
 running() { [ -f "$STATE/$1.pid" ] && ps -p "$(cat "$STATE/$1.pid")" -o command= 2>/dev/null | grep -q -- "$2"; }
@@ -78,6 +84,17 @@ if [ "${DEMO_FORK:-}" = 1 ]; then
     wait_for 60 cast chain-id --rpc-url http://127.0.0.1:8545 || die "anvil did not start: $STATE/anvil.log"
   fi
   RPC=http://127.0.0.1:8545
+else
+  # The public RPC refuses bursts of calls (rate limit): everything reaches it through a local relay
+  # that forwards at most 4 calls at a time and retries refused ones.
+  if ! running rpc-relay rpc-relay; then
+    say "starting a JSON-RPC relay to the chain on 127.0.0.1:8547"
+    (cd "$STATE" || exit; RPC_RELAY_UPSTREAM=$RPC nohup node "$REPO/scripts/rpc-relay.mjs" 8547 \
+      >rpc-relay.log 2>&1 &
+      echo $! >rpc-relay.pid)
+    wait_for 10 grep -q relay "$STATE/rpc-relay.log" || die "the RPC relay did not start: $STATE/rpc-relay.log"
+  fi
+  RPC=http://127.0.0.1:8547
 fi
 
 # --- the sponsor -----------------------------------------------------------------------------------
@@ -177,14 +194,19 @@ else
   "${COMPOSE[@]}" build >"$STATE/build.log" 2>&1 || die "image build failed: $STATE/build.log"
   # The container gets the agent's environment only, whatever this shell holds for the root home.
   MANTLE_AA_KEYSTORE_PASSWORD=$(cat "$DEMO_AGENT_PASSWORD_FILE")
-  MANTLE_AA_RPC_URL=${RPC//127.0.0.1/host.docker.internal}
-  MANTLE_AA_RPC_URL=${MANTLE_AA_RPC_URL//localhost/host.docker.internal}
+  MANTLE_AA_RPC_URL=$(dockerhost "$RPC")
   MANTLE_AA_SPONSOR_URL=http://host.docker.internal:$PORT
+  # Where Telegram is reachable only through a proxy, the container uses this shell's (DEMO_PROXY=
+  # turns it off): Node's fetch (the autopilot's push) and OpenClaw read these variables.
+  PROXY=${DEMO_PROXY-${HTTPS_PROXY:-${https_proxy:-}}}
+  HTTPS_PROXY=$(dockerhost "$PROXY") NODE_USE_ENV_PROXY=${PROXY:+1}
+  NO_PROXY=${NO_PROXY:-${no_proxy:-localhost,127.0.0.1}},host.docker.internal
   MANTLE_MEME_CONTAINER=$CONTAINER MANTLE_MEME_GATEWAY=1
   MANTLE_MEME_AGENT_HOME=$AGENT_HOME MANTLE_MEME_OPENCLAW_STATE=$OC_STATE
   export MANTLE_AA_KEYSTORE_PASSWORD MANTLE_AA_RPC_URL MANTLE_AA_SPONSOR_URL MANTLE_MEME_CONTAINER \
     MANTLE_MEME_GATEWAY MANTLE_MEME_AGENT_HOME MANTLE_MEME_OPENCLAW_STATE MANTLE_MEME_TG_BOT_TOKEN \
-    MANTLE_MEME_TG_CHAT_ID MANTLE_MEME_TG_API_URL
+    MANTLE_MEME_TG_CHAT_ID MANTLE_MEME_TG_API_URL HTTPS_PROXY NODE_USE_ENV_PROXY NO_PROXY
+  [ -z "$PROXY" ] || say "the container reaches the internet through this shell's proxy (https_proxy)"
   say "starting container $CONTAINER (OpenClaw gateway with the Telegram channel, the launcher)"
   "${COMPOSE[@]}" up -d --no-build >>"$STATE/build.log" 2>&1 || die "container start failed: $STATE/build.log"
   docker inspect -f '{{.Id}}' "$CONTAINER" >"$STATE/container"

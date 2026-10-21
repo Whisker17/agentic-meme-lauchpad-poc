@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Stops what scripts/demo-up.sh started, and only that (its state directory records every PID and
 # the container id): the autopilot first (`autopilot stop`), then the container, market-sim, the
-# sponsor and, after a rehearsal, the mock Bot API and the anvil fork. Safe to run again.
+# sponsor, the RPC relay and, after a rehearsal, the mock Bot API and the anvil fork. Safe to run
+# again.
 #
 # Env: DEMO_STATE_DIR (default ~/.mantle-meme-demo).
 set -uo pipefail
@@ -32,7 +33,8 @@ if [ -f "$STATE/container" ]; then
 fi
 
 # name: what its command line contains (a reused PID is left alone)
-for p in market-sim:market-sim sponsor:"sponsor serve" mock-telegram:mock-telegram anvil:anvil; do
+for p in market-sim:market-sim sponsor:"sponsor serve" rpc-relay:rpc-relay mock-telegram:mock-telegram \
+  anvil:anvil; do
   file=$STATE/${p%%:*}.pid
   [ -f "$file" ] || continue
   pid=$(cat "$file")

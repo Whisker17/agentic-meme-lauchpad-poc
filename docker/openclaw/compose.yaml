@@ -24,6 +24,10 @@ services:
       # the OpenClaw gateway, which reads the bot token from TELEGRAM_BOT_TOKEN (never from a file).
       MANTLE_MEME_GATEWAY:
       TELEGRAM_BOT_TOKEN: ${MANTLE_MEME_TG_BOT_TOKEN:-}
+      # A proxy, where Telegram is reachable only through one (scripts/demo-up.sh).
+      HTTPS_PROXY:
+      NO_PROXY:
+      NODE_USE_ENV_PROXY:
       # Optional daemon timing (the dry run shortens it). The launcher starts the daemon with this
       # container environment, so `docker exec -e` does not reach it.
       MANTLE_MEME_AUTOPILOT_TICK_MS:

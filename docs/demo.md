@@ -11,7 +11,7 @@ What runs where:
 | Where | What | Started by |
 | --- | --- | --- |
 | Root terminal (you) | the root key: account setup, `market-sim pump`, revoke | you |
-| This Mac | `mantle-aa sponsor serve` (pays all gas of the account), `market-sim run` (other traders) | `scripts/demo-up.sh` |
+| This Mac | `mantle-aa sponsor serve` (pays all gas of the account), `market-sim run` (other traders), a JSON-RPC relay to Mantle Sepolia | `scripts/demo-up.sh` |
 | Container `mantle-meme-openclaw` | the OpenClaw gateway with the Telegram channel, the agent (the `mantle-meme` skill, agent home only), the autopilot daemon | `scripts/demo-up.sh` |
 | Telegram | your DM with the bot: what you type and the agent's replies, plus the autopilot's pushes (same bot) | you |
 
@@ -91,7 +91,7 @@ Then, for the demo on Mantle Sepolia (with the paths of your key files):
 ```bash
 export DEMO_RELAYER_KEY_FILE=~/.mantle-aa/keys/<relayer key file>
 export MARKET_SIM_MNEMONIC_FILE=~/.mantle-aa/keys/<market-sim mnemonic file>
-export MANTLE_AA_RPC_URL=https://rpc.sepolia.mantle.xyz MARKET_SIM_RPC_URL=https://rpc.sepolia.mantle.xyz
+export MANTLE_AA_RPC_URL=http://127.0.0.1:8547 MARKET_SIM_RPC_URL=http://127.0.0.1:8547   # the relay
 export MANTLE_AA_HOME=~/.mantle-meme-root               # the root home, only in this terminal
 export MANTLE_MEME_AGENT_HOME=~/.mantle-meme-agent      # the agent home the container gets
 ```
@@ -115,6 +115,10 @@ In a rehearsal, instead of typing in Telegram, send each message with
 model turns are real (your model login). After a rehearsal, open a new terminal for the demo.
 
 `demo-up.sh` gives the container the agent home and the agent's password, never the root ones.
+On Sepolia everything reaches the chain through a relay on `127.0.0.1:8547` that `demo-up.sh`
+starts (`scripts/rpc-relay.mjs`): the public RPC refuses bursts of calls ("rate limit exceeded"),
+and the relay sends at most 4 at a time and retries the refused ones. If this shell uses a proxy
+(`https_proxy`), the container reaches Telegram and the model through it too.
 
 ## Step 1 (human, local): set up the account and start the demo
 
@@ -238,6 +242,8 @@ scripts/demo-up.sh sponsor && scripts/demo-up.sh      # with DEMO_ACCOUNT set
 | Exit 20 / 21 (`SPONSOR_*`) | The sponsor refused or is busy: `~/.mantle-meme-demo/sponsor.log`; `DEMO_ACCOUNT` must be the account; the relayer needs MNT |
 | Exit 44 (`AUTOPILOT_STATE`) | The autopilot already runs (or none runs, on stop) |
 | `requested block is above the latest consensus block`, timeouts | The public RPC is load-balanced and lags at times: send the message (or rerun `market-sim pump`) again |
+| `RPC Request failed`, `rate limit exceeded` | Something reaches the public RPC without the relay: `MANTLE_AA_RPC_URL` and `MARKET_SIM_RPC_URL` must be `http://127.0.0.1:8547` |
+| `the Telegram channel did not start`, `getMe` timeouts in the log | Telegram is blocked on this network: run `demo-up.sh` from a shell whose `https_proxy` reaches it (the container uses that proxy) |
 | `market-sim pump` fails with a nonce error | Use `--wallet 2`: `market-sim run` uses wallets 0 and 1 |
 | After `demo-up.sh`, the bot writes "continuing your interrupted request" | OpenClaw resumes a turn that was running when the container stopped. Run `demo-down.sh` only when the bot is idle |
 | `cannot verify Gateway ownership … wait 90 s` from a `docker run … openclaw.mjs` | Another container uses `~/.mantle-meme-openclaw`: run OpenClaw commands with `docker exec mantle-meme-openclaw node openclaw.mjs …`, or wait 90 s after `demo-down.sh` |
