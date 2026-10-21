@@ -16,9 +16,13 @@ if [ -f "$STATE/container" ]; then
   if [ -n "$name" ]; then
     name=${name#/}
     if [ "$(docker inspect -f '{{.State.Running}}' "$id")" = true ]; then
-      say "stopping the autopilot"
-      docker exec "$id" node /opt/mantle-meme/packages/cli/dist/bin/mantle-meme.js autopilot stop --json ||
-        true # exit 44: none running
+      docker exec "$id" node /opt/mantle-meme/packages/cli/dist/bin/mantle-meme.js autopilot stop \
+        >/dev/null 2>&1
+      case $? in
+      0) say "stopped the autopilot" ;;
+      44) say "no autopilot running" ;;
+      *) say "autopilot stop failed; removing the container ends it" ;;
+      esac
     fi
     say "removing container $name"
     # The gateway drains running turns first; after 30 s Docker stops it.

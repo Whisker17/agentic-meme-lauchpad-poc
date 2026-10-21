@@ -190,9 +190,16 @@ It stops the autopilot (`autopilot stop`), removes the container, then stops mar
 sponsor (and the fork and the mock after a rehearsal). Running it again does nothing. Your homes,
 `~/.mantle-meme-openclaw` and the logs in `~/.mantle-meme-demo` stay.
 
-To run the demo again: grant again (`mantle-aa session grant --agent trader --policy "$MANTLE_AA_HOME/policy.json"`,
-then the same `session export`), `scripts/demo-up.sh sponsor` (with `DEMO_ACCOUNT` set) and
-`scripts/demo-up.sh`.
+To run the demo again (a revoked or expired grant), after `demo-down.sh`: grant again, and export
+into an empty agent home (`session export` refuses one the agent has used), then start again.
+
+```bash
+mantle-aa session grant --agent trader --policy "$MANTLE_AA_HOME/policy.json"
+rm -rf "$MANTLE_MEME_AGENT_HOME"      # the old session key and its journal only
+MANTLE_AA_EXPORT_PASSWORD=$(cat "$DEMO_AGENT_PASSWORD_FILE") \
+  mantle-aa session export --agent trader --out "$MANTLE_MEME_AGENT_HOME"
+scripts/demo-up.sh sponsor && scripts/demo-up.sh      # with DEMO_ACCOUNT set
+```
 
 ## Before recording
 
@@ -227,7 +234,7 @@ then the same `session export`), `scripts/demo-up.sh sponsor` (with `DEMO_ACCOUN
 | `error: the autopilot launcher is not reachable` | The container's main process is gone or the image predates it: `scripts/demo-down.sh`, then `scripts/demo-up.sh` (it rebuilds the image) |
 | No `Bought` push after a launch | `docker exec mantle-meme-openclaw node /opt/mantle-meme/packages/cli/dist/bin/mantle-meme.js autopilot log` shows what the autopilot did (`skipped too_old`: the public RPC was slow; the next launch will do) |
 | Exit 11 (`LIMIT_EXCEEDED`) | The limit is used up: grant a new policy (step 1.3) |
-| Exit 13 (`KEY_EXPIRED_OR_REVOKED`) | Revoked or older than 24 hours: grant and export again (Afterwards), then restart the autopilot from Telegram |
+| Exit 13 (`KEY_EXPIRED_OR_REVOKED`) | Revoked or older than 24 hours: grant and export again ("Afterwards") |
 | Exit 20 / 21 (`SPONSOR_*`) | The sponsor refused or is busy: `~/.mantle-meme-demo/sponsor.log`; `DEMO_ACCOUNT` must be the account; the relayer needs MNT |
 | Exit 44 (`AUTOPILOT_STATE`) | The autopilot already runs (or none runs, on stop) |
 | `requested block is above the latest consensus block`, timeouts | The public RPC is load-balanced and lags at times: send the message (or rerun `market-sim pump`) again |
