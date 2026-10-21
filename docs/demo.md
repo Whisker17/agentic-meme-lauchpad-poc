@@ -64,8 +64,10 @@ key files named below.
 5. **Key files** (testnet keys, never printed by the scripts):
    - the sponsor's **relayer key**: a file holding one `0x…` private key, bare or as `KEY=0x…`. The
      wallet pays all gas of the account: at least 1 MNT on Mantle Sepolia.
-   - the **market-sim mnemonic** (a file with the 12 words). Its EOAs 0, 1 and 2 pay their own gas:
-     at least 0.2 MNT each. `market-sim addresses` (below) prints them.
+   - the **market-sim mnemonic** (a file with the 12 words). Its EOAs pay their own gas, about
+     0.02 MNT a transaction (measured 2026-10-21). `market-sim run` sends from EOAs 0 and 1, about
+     1.3 transactions a minute: give each at least 0.5 MNT for a 20-minute session. EOA 2 only
+     pumps (step 6): 0.1 MNT. `market-sim addresses` (below) prints them.
    - two **passwords**, one for the root home and one for the agent home (DESIGN §8.1):
 
      ```bash
@@ -190,8 +192,8 @@ runs out. The 50 mUSD daily limit covers the whole script.
 scripts/demo-down.sh
 ```
 
-It stops the autopilot (`autopilot stop`), removes the container, then stops market-sim and the
-sponsor (and the fork and the mock after a rehearsal). Running it again does nothing. Your homes,
+It stops the autopilot (`autopilot stop`), removes the container, then stops market-sim, the
+sponsor and the relay (and the fork and the mock after a rehearsal). Running it again does nothing. Your homes,
 `~/.mantle-meme-openclaw` and the logs in `~/.mantle-meme-demo` stay.
 
 To run the demo again (a revoked or expired grant), after `demo-down.sh`: grant again, and export
@@ -212,7 +214,7 @@ scripts/demo-up.sh sponsor && scripts/demo-up.sh      # with DEMO_ACCOUNT set
       "no usable model login".
 - [ ] `~/.mantle-aa/keys/meme-demo-telegram.env` holds the token and your user id; you pressed
       **Start** in the bot.
-- [ ] The relayer holds ≥ 1 MNT, the market-sim EOAs ≥ 0.2 MNT each:
+- [ ] The relayer holds ≥ 1 MNT, market-sim EOAs 0 and 1 ≥ 0.5 MNT each, EOA 2 ≥ 0.1 MNT:
       `cast balance <address> --ether --rpc-url https://rpc.sepolia.mantle.xyz` for the relayer
       and each address of `market-sim addresses`.
 - [ ] Step 1 done less than 24 hours before (the grant expires); `scripts/demo-up.sh` ended with
@@ -237,7 +239,7 @@ scripts/demo-up.sh sponsor && scripts/demo-up.sh      # with DEMO_ACCOUNT set
 | The bot answers with a model error, or after minutes | The model provider is busy (HTTP 503 "capacity"): `docker logs mantle-meme-openclaw 2>&1 \| grep model-fetch`. OpenClaw retries for about 3 minutes; wait, then send the message again |
 | `error: the autopilot launcher is not reachable` | The container's main process is gone or the image predates it: `scripts/demo-down.sh`, then `scripts/demo-up.sh` (it rebuilds the image) |
 | No `Bought` push after a launch | `docker exec mantle-meme-openclaw node /opt/mantle-meme/packages/cli/dist/bin/mantle-meme.js autopilot log` shows what the autopilot did (`skipped too_old`: the public RPC was slow; the next launch will do) |
-| Exit 11 (`LIMIT_EXCEEDED`) | The limit is used up: grant a new policy (step 1.3) |
+| Exit 11 (`LIMIT_EXCEEDED`) | The limit is used up: grant again ("Afterwards") |
 | Exit 13 (`KEY_EXPIRED_OR_REVOKED`) | Revoked or older than 24 hours: grant and export again ("Afterwards") |
 | Exit 20 / 21 (`SPONSOR_*`) | The sponsor refused or is busy: `~/.mantle-meme-demo/sponsor.log`; `DEMO_ACCOUNT` must be the account; the relayer needs MNT |
 | Exit 44 (`AUTOPILOT_STATE`) | The autopilot already runs (or none runs, on stop) |

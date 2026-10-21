@@ -23,8 +23,9 @@
 #   DEMO_STATE_DIR               PIDs, logs, the sponsor's config and ledger (default ~/.mantle-meme-demo)
 #   DEMO_SPONSOR_PORT            default 8548
 #   DEMO_CONTAINER               the container's name (default mantle-meme-openclaw)
-#   DEMO_MARKET_SIM_ARGS         `market-sim run` options (default --wallets 2 --create-every 60-120:
-#                                wallets 0 and 1, so the human's `market-sim pump --wallet 2` has its own)
+#   DEMO_MARKET_SIM_ARGS         `market-sim run` options (default --wallets 2 --create-every 60-120
+#                                --trade-every 60-120: wallets 0 and 1, so the human's `market-sim pump
+#                                --wallet 2` has its own; about 1.3 transactions a minute)
 #   DEMO_MOCK_TELEGRAM=1         a mock Bot API (scripts/mock-telegram.mjs) instead of Telegram
 #   DEMO_FORK=1                  rehearsal: an anvil fork of DEMO_RPC_URL, throwaway public anvil
 #                                keys (no key files needed) and the mock Bot API
@@ -40,7 +41,7 @@ OC_STATE=${MANTLE_MEME_OPENCLAW_STATE:-$HOME/.mantle-meme-openclaw}
 COMPOSE=(docker compose -p "$CONTAINER" -f "$REPO/docker/openclaw/compose.yaml")
 AA="$REPO/packages/cli/node_modules/.bin/mantle-aa"
 SIM="$REPO/tools/market-sim/dist/bin.js"
-SIM_ARGS=${DEMO_MARKET_SIM_ARGS:---wallets 2 --create-every 60-120}
+SIM_ARGS=${DEMO_MARKET_SIM_ARGS:---wallets 2 --create-every 60-120 --trade-every 60-120}
 MOCK=${DEMO_MOCK_TELEGRAM:-}
 [ "${DEMO_FORK:-}" = 1 ] && MOCK=1
 
