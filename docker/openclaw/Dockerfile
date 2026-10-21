@@ -9,9 +9,12 @@ COPY --chown=node:node . .
 RUN pnpm install --frozen-lockfile && pnpm build \
  && mkdir -p /home/node/.local/bin \
  && chmod +x packages/cli/dist/bin/mantle-meme.js \
- && ln -s /opt/mantle-meme/packages/cli/dist/bin/mantle-meme.js /home/node/.local/bin/mantle-meme \
+ && chmod +x docker/openclaw/mantle-meme.mjs \
+ && ln -s /opt/mantle-meme/docker/openclaw/mantle-meme.mjs /home/node/.local/bin/mantle-meme \
  && mantle-meme --help > /dev/null
 
 WORKDIR /app
-# Idle: agent turns run with `docker exec`, and the autopilot daemon they start outlives the turn.
-CMD ["sleep", "infinity"]
+# Agent turns run with `docker exec`. OpenClaw's exec tool kills every process a command leaves
+# behind, so the main process is a launcher that runs `autopilot start` for the agent's `mantle-meme`
+# (a wrapper): the daemon is the launcher's descendant, not OpenClaw's (skills/mantle-meme/README.md).
+CMD ["node", "/opt/mantle-meme/docker/openclaw/launcher.mjs"]

@@ -242,6 +242,7 @@ async function until<T>(f: () => T | undefined, what: string, ms = 120_000): Pro
 }
 
 let failed = false;
+let events: ReturnType<typeof readEvents> = [];
 try {
   await a.start();
   await runStep(a, STEPS[0] as (typeof STEPS)[0]); // §9.2 step 1: the human's setup
@@ -328,6 +329,8 @@ try {
 } finally {
   // Stop the daemon the agent started (only that pid, or the teardown does), then everything the
   // flow started.
+  // the agent's events, before the teardown stops the daemon
+  events = readEvents(a.agentHome);
   if (teardownCmd) {
     const r = await sh(teardownCmd);
     if (r.status !== 0) notes.push(`DRY_RUN_TEARDOWN exit ${r.status}: ${a.scrub(r.stderr)}`);
@@ -343,7 +346,6 @@ try {
   fork.stop();
 }
 
-const events = readEvents(a.agentHome);
 const brief = (out: string) => {
   try {
     const j = JSON.parse(out);

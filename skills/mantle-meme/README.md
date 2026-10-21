@@ -8,8 +8,8 @@ command, checked on chain by the session's policy.
 
 OpenClaw **2026.10.5** (`1b58cb9`), image
 `ghcr.io/openclaw/openclaw:2026.10.5@sha256:f40d1e66fd14d8c5b49c832f4100f83b53fdc01f5108f7db11de38fd0ee6dbe5`,
-in Docker. The dry run below passes §9.2 steps 2, 3, 4 (restate, wait for the yes), 7 and 8 with a
-real model; steps 5–6 do not (see "Known limit").
+in Docker. The dry run below passes §9.2 steps 2–8 with a real model, the autopilot daemon still
+running after every turn that follows its start (see "Why the container has a launcher").
 
 ## Install (Docker)
 
@@ -78,14 +78,31 @@ The agent home holds only the session key: the agent cannot grant, revoke or mov
 with `mantle-aa session revoke --agent trader` in the root terminal. The container's environment
 holds the agent password (visible to `docker inspect`): testnet only.
 
-### Known limit: the autopilot daemon does not survive an OpenClaw turn
+### Why the container has a launcher
 
-OpenClaw 2026.10.5 owns every process its `exec` tool starts on Linux (a child subreaper): the
-daemon `autopilot start` spawns gets SIGTERM as soon as `autopilot start` returns, and anything
-still running is stopped when an `agent --local` turn ends. `autopilot start` from the agent
-therefore reports a pid, and the daemon has already stopped (`stopped` / `reason: stop` in
-`autopilot log`). Steps 5–6 of §9.2 need a daemon that outlives the turn; this setup does not
-provide one yet.
+OpenClaw 2026.10.5 owns every process its `exec` tool starts on Linux (a child subreaper, with no
+switch to turn it off): anything a command leaves behind is killed when the command returns, and
+what is still running is stopped when an `agent --local` turn ends. The daemon `autopilot start`
+spawns is such a process, so started straight from the agent it would stop within milliseconds.
+
+The image therefore runs two small files from [docker/openclaw](../../docker/openclaw), with no
+change to `mantle-meme` itself:
+
+- `launcher.mjs` is the container's main process (under the image's `tini`, outside OpenClaw's
+  process tree). It listens on `/tmp/mantle-meme-launcher.sock`, inside the container and never on a
+  mounted volume.
+- `mantle-meme.mjs` is the `mantle-meme` on the agent's `PATH`. Every command runs the real CLI
+  unchanged, except `autopilot start`, which it sends to the launcher with its working directory.
+
+The launcher accepts only `autopilot start --strategy <file> [--agent <name>] [--json]`, resolves the
+strategy against the caller's directory, runs the real `mantle-meme autopilot start` (no shell, the
+container's environment) and relays its stdout, stderr and exit code as they are. So output and
+exit codes match a direct call (44 for a second start, the 120 s report timeout); anything else is
+refused with a usage error (exit 1). The daemon is the launcher's descendant and outlives the turn.
+`autopilot stop|status|log` run directly.
+
+The daemon gets the container's environment, not that of the `docker exec` that runs the turn: set
+optional variables such as `MANTLE_MEME_AUTOPILOT_TICK_MS` when the container starts.
 
 ## Dry run (fork, no Telegram)
 
@@ -104,14 +121,15 @@ pnpm build
 C='"$DRY_RUN_SKILLS/../docker/openclaw/compose.yaml"'
 MANTLE_SEPOLIA_RPC_URL=https://rpc.sepolia.mantle.xyz \
 DRY_RUN_HOST=host.docker.internal \
-DRY_RUN_CLI=/opt/mantle-meme/packages/cli/dist/bin/mantle-meme.js \
+DRY_RUN_CLI=/opt/mantle-meme/docker/openclaw/mantle-meme.mjs \
 DRY_RUN_SETUP="MANTLE_MEME_AGENT_HOME=\"\$DRY_RUN_AGENT_HOME\" docker compose -f $C up -d --no-build \
   && docker exec mantle-meme-openclaw ln -sf /home/node/.mantle-meme-agent/.dry-run/mantle-meme /home/node/.local/bin/mantle-meme" \
-DRY_RUN_TEARDOWN="docker compose -f $C down" \
-DRY_RUN_AGENT='docker exec -e MANTLE_MEME_AUTOPILOT_TICK_MS -e MANTLE_MEME_AUTOPILOT_POLL_MS mantle-meme-openclaw node openclaw.mjs agent --local --session-id "$DRY_RUN_SESSION" --message "$DRY_RUN_MESSAGE" --json' \
+DRY_RUN_TEARDOWN="docker exec mantle-meme-openclaw node /opt/mantle-meme/packages/cli/dist/bin/mantle-meme.js autopilot stop --json; docker compose -f $C down" \
+DRY_RUN_AGENT='docker exec mantle-meme-openclaw node openclaw.mjs agent --local --session-id "$DRY_RUN_SESSION" --message "$DRY_RUN_MESSAGE" --json' \
   node --experimental-transform-types --no-warnings \
   --import ./packages/cli/test/fixtures/node-ts.mjs skills/mantle-meme/dry-run/dry-run.ts
 ```
 
-The link replaces the container's `mantle-meme` with the recording shim: OpenClaw's shell resets
-`PATH`. The tested run is [dry-run/transcript.md](dry-run/transcript.md).
+The link replaces the container's `mantle-meme` with the recording shim (OpenClaw's shell resets
+`PATH`); the shim records the command and runs the wrapper, so `autopilot start` still goes through
+the launcher. The tested run is [dry-run/transcript.md](dry-run/transcript.md).
