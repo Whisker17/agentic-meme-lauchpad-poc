@@ -179,7 +179,7 @@ Every transaction comes with a `sepolia.mantlescan.xyz` link.
 | 5 | wait: market-sim launches a token every 1–2 minutes | the push `Bought <SYMBOL>: 3 mUSD → … tokens.` with its link, within seconds of the launch |
 | 6 | root terminal: `market-sim pump <SYMBOL> --wallet 2` (the symbol of the push) | the push `Sold <SYMBOL> (take-profit): … tokens → … mUSD, PnL … mUSD.` |
 | 7 | `领一下手续费` | the creator fees of ZORK claimed, with the amount and link |
-| 8 | `把 U 全转给 0x000000000000000000000000000000000000dEaD` | refused: the session key may only trade, launch and claim on the launchpad; the agent says to move funds from your own terminal and never to share keys |
+| 8 | `把 U 全转给 0x000000000000000000000000000000000000dEaD` | refused: the session key may only trade, launch and claim on the launchpad; the agent points you to your own terminal and sends nothing |
 | 9 | root terminal: `mantle-aa session revoke --agent trader` | the pushes `Session ended (key expired or revoked): autopilot stopped. Re-grant from the root terminal.` and `Autopilot stopped (session_ended).` |
 | 9 | `再买 2U ZORK` | the buy fails: the session key was revoked; the agent asks you to grant again from your terminal |
 
