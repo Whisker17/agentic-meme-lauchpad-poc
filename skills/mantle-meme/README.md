@@ -31,15 +31,53 @@ off (the container is the boundary). Run from the repository root:
    docker compose -f docker/openclaw/compose.yaml build
    ```
 
-2. Log in to a model provider, once, as the owner (needs a TTY), and load this skill:
+2. Log in to a model provider, once, as the owner, and load this skill. `oc` below is shorthand
+   for one OpenClaw command on the state directory (`-it`: the login prompts need a TTY):
 
    ```bash
    mkdir -p ~/.mantle-meme-openclaw
-   docker run --rm -it --entrypoint node -v ~/.mantle-meme-openclaw:/home/node/.openclaw \
-     mantle-meme-openclaw:2026.10.5 openclaw.mjs models auth login
-   docker run --rm --entrypoint node -v ~/.mantle-meme-openclaw:/home/node/.openclaw \
-     mantle-meme-openclaw:2026.10.5 openclaw.mjs config set skills.load.extraDirs '["/skills"]' --strict-json
+   oc() { docker run --rm -it --entrypoint node -v ~/.mantle-meme-openclaw:/home/node/.openclaw \
+     mantle-meme-openclaw:2026.10.5 openclaw.mjs "$@"; }
+   oc config set skills.load.extraDirs '["/skills"]' --strict-json
    ```
+
+   Then take one of two paths.
+
+   **(a) A provider that ships an OpenClaw plugin** (e.g. `openai`, `anthropic`):
+
+   ```bash
+   oc models auth login --provider openai
+   ```
+
+   `openai` opens an OAuth sign-in: open the printed URL in your browser, then paste the redirect
+   URL back at the prompt. `login` works only for providers registered by a plugin; for anything
+   else it fails with "No provider plugins found".
+
+   **(b) A custom OpenAI Responses-compatible endpoint.** Replace `mygw`, `my-model` and the URL
+   (a placeholder) with your provider's:
+
+   ```bash
+   # 1. the provider
+   oc config set models.providers.mygw '{"baseUrl":"https://llm.example.com/v1",
+     "api":"openai-responses","auth":"api-key","models":[{"id":"my-model","name":"my-model"}]}' --strict-json
+   # 2. its model as the default for agent turns
+   oc config set agents.defaults.model.primary mygw/my-model
+   # 3. check the config
+   oc config validate                     # Config valid
+   # 4. the key, typed (hidden) at the prompt "Paste API key for mygw": never on the command line
+   oc models auth paste-api-key --provider mygw
+   # 5. check
+   oc models list                         # mygw/my-model ... Auth yes ... default
+   oc models status --check --plain; echo "exit $?"
+   ```
+
+   Before the key is pasted, `models list` shows `Auth no` and `models status --check --plain` prints
+   `mygw/my-model`, reports `Missing auth - mygw` and exits 1. After it, `Auth yes`, and the check
+   exits 0 (what [scripts/demo-up.sh](../../scripts/demo-up.sh) requires).
+
+   These checks prove only that the config is valid, the model is selected and a key is stored
+   locally: `models status --check` sends no request, so a wrong key or URL still passes. Only a
+   real agent turn (install step 5) proves that the provider accepts the key.
 
 3. The human sets up the account in the root terminal and exports the agent home to
    `~/.mantle-meme-agent` (DESIGN §8.1, [packages/cli/README.md](../../packages/cli/README.md)
