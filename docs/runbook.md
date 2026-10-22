@@ -240,14 +240,19 @@ oc models status --check --plain; echo "exit $?"
 3. 打开你的新 bot，点 **Start**，再随便发一句话，比如 `hi`。为什么：bot 只能给按过 Start 的人发消息；
    发的这句话让下一步能查到你的 id。
 4. 读出你的 chat id，追加到同一个文件。在私聊里，chat id 就是你的用户 id。命令不会打印 token 或 chat id，
-   只打印保存结果和文件中的变量数量：
+   只打印保存结果和文件中的变量数量。带 token 的 URL 由 shell 内建的 `printf` 经标准输入交给 `curl -K -`，
+   所以 token 不会出现在任何进程的命令行参数里（别人用 `ps` 也看不到）。只取私聊里的数字 id，而且必须
+   恰好一个：
 
    ```bash
    ( . "$F"
-     uid=$(curl -s "https://api.telegram.org/bot$MANTLE_MEME_TG_BOT_TOKEN/getUpdates" |
-       jq -r '[.result[].message.from.id] | unique | if length == 1 then .[0] else empty end')
-     [ -n "$uid" ] && printf 'MANTLE_MEME_TG_CHAT_ID=%s\n' "$uid" >> "$F" && echo "chat id saved" ||
-       echo "no single sender found" )
+     uid=$(printf 'url = "https://api.telegram.org/bot%s/getUpdates"\n' "$MANTLE_MEME_TG_BOT_TOKEN" |
+       curl -sS -K - | jq -r '[.result[]?.message? | select(.chat.type? == "private")
+         | .chat.id | select(type == "number")] | unique | if length == 1 then .[0] else empty end')
+     case $uid in
+       ''|*[!0-9]*) echo "no single sender found" ;;
+       *) printf 'MANTLE_MEME_TG_CHAT_ID=%s\n' "$uid" >> "$F" && echo "chat id saved" ;;
+     esac )
    grep -c '^MANTLE_MEME_TG_' "$F"
    ```
 
@@ -260,7 +265,7 @@ oc models status --check --plain; echo "exit $?"
 
 不对？先查这个：
 
-- `no single sender found`：bot 还没收到消息（回到第 3 步），或者不止一个人给它发过消息。
+- `no single sender found`：bot 还没收到私聊消息（回到第 3 步），或者不止一个人私聊过它。
 - `curl` 卡住：你所在的网络可能只能通过代理访问 Telegram，先设好 `https_proxy` 再跑。之后
   `demo-up.sh` 也要在同一个设了代理的 shell 里跑，容器会沿用它。
 - 为什么这一步要在 `demo-up.sh` 之前做：一个 bot 同时只能有一个轮询者。演示跑起来后 gateway 在轮询，
