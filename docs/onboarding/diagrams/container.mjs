@@ -25,7 +25,7 @@ export const skeleton = [
   tag(
     36,
     54,
-    "容器 mantle-meme-openclaw · OpenClaw 2026.10.5 + 内置 mantle-meme · 沙箱关闭，容器隔离凭据",
+    "容器 mantle-meme-openclaw · OpenClaw 2026.10.6 + 内置 mantle-meme · 沙箱关闭，容器隔离凭据",
     C.struct,
     16,
   ),

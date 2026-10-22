@@ -31,7 +31,7 @@ key files named below.
    pnpm install && pnpm build
    ```
 
-3. **The image** `mantle-meme-openclaw:2026.10.5` and **the model login** in
+3. **The image** `mantle-meme-openclaw:2026.10.6` and **the model login** in
    `~/.mantle-meme-openclaw`: [skills/mantle-meme/README.md](../skills/mantle-meme/README.md)
    "Install (Docker)", steps 1 and 2. `demo-up.sh` rebuilds the image when the checkout changed and
    refuses to start without a usable login.
