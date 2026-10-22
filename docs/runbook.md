@@ -242,10 +242,11 @@ oc models status --check --plain; echo "exit $?"
 4. 读出你的 chat id，追加到同一个文件。在私聊里，chat id 就是你的用户 id。命令不会打印 token 或 chat id，
    只打印保存结果和文件中的变量数量。带 token 的 URL 由 shell 内建的 `printf` 经标准输入交给 `curl -K -`，
    所以 token 不会出现在任何进程的命令行参数里（别人用 `ps` 也看不到）。只取私聊里的数字 id，而且必须
-   恰好一个：
+   恰好一个。文件里已经有 chat id 时，命令什么都不改，只打印 `chat id already saved`：
 
    ```bash
    ( . "$F"
+     if grep -q '^MANTLE_MEME_TG_CHAT_ID=' "$F"; then echo "chat id already saved"; exit; fi
      uid=$(printf 'url = "https://api.telegram.org/bot%s/getUpdates"\n' "$MANTLE_MEME_TG_BOT_TOKEN" |
        curl -sS -K - | jq -r '[.result[]?.message? | select(.chat.type? == "private")
          | .chat.id | select(type == "number")] | unique | if length == 1 then .[0] else empty end')
@@ -262,6 +263,9 @@ oc models status --check --plain; echo "exit $?"
    chat id saved
    2
    ```
+
+   再跑一次会看到 `chat id already saved` 和 `2`。要故意换一个 chat id，先删掉旧的那一行
+   （`sed -i '' '/^MANTLE_MEME_TG_CHAT_ID=/d' "$F"`），再跑这一步。
 
 不对？先查这个：
 
@@ -1023,21 +1027,63 @@ interrupted request”）。
 
 ### 8.2 重跑（授权已撤销或过期）
 
-`demo-down.sh` 之后，在设好 [7.2](#72-根终端) 环境变量的根终端里。`rm -rf` 只删 agent home：旧的 session key
-和它的交易记录。
+`demo-down.sh` 之后，在设好 [7.2](#72-根终端) 环境变量的根终端里，按顺序一块一块地跑。每一块都要先看到
+“看到这个就对了”，才跑下一块；前面没成功就不要清空 agent home。
+
+记下账户地址：
 
 ```bash
 export DEMO_ACCOUNT=$(mantle-aa keys list | jq -r '.profiles[] | select(.name == "owner") | .account')
-mantle-aa session grant --agent trader --policy "$MANTLE_AA_HOME/policy.json"
-rm -rf "$MANTLE_MEME_AGENT_HOME"
-MANTLE_AA_EXPORT_PASSWORD=$(cat "$DEMO_AGENT_PASSWORD_FILE") \
-  mantle-aa session export --agent trader --out "$MANTLE_MEME_AGENT_HOME"
-scripts/demo-up.sh sponsor && scripts/demo-up.sh
+echo "$DEMO_ACCOUNT"
 ```
 
-看到这个就对了：`session grant` 输出新的 `expiry` 和 `"previousProfile": "trader.v1"`；`session export`
-输出 `"role": "agent"`；`demo-up.sh` 的最后一行和第 1 步一样。之后在 Telegram 问余额和额度，剩余额度回到
-50 mUSD。
+看到这个就对了：一行你的账户地址。
+
+不对？先查这个：输出空行，说明 `$MANTLE_AA_HOME` 不是第 1 步用的 root home，检查 [7.2](#72-根终端) 的环境变量。
+
+启动 RPC 中继和 sponsor（`demo-down.sh` 把它们停了，授权要经过它们）：
+
+```bash
+scripts/demo-up.sh sponsor
+```
+
+看到这个就对了：和第 1 步一样，最后一行是 `demo-up: ready for the human's setup: …`。
+
+不对？先查这个：`DEMO_RELAYER_KEY_FILE must name a readable file`，说明 [7.2](#72-根终端) 的环境变量没设。
+
+给 `trader` 一把新的 session key：
+
+```bash
+mantle-aa session grant --agent trader --policy "$MANTLE_AA_HOME/policy.json"
+```
+
+看到这个就对了：输出带新的 `expiry`、`hash` 和 `"previousProfile": "trader.v1"` 的 JSON（每重跑一次，
+后面的数字加 1）。
+
+不对？先查这个：卡住然后报 `Sponsor did not answer`，说明 sponsor 没起来，看上一块的输出和
+`~/.mantle-meme-demo/sponsor.log`。
+
+清空 agent home 并重新导出。`rm -rf` 只删 agent home：旧的 session key 和它的交易记录：
+
+```bash
+rm -rf "$MANTLE_MEME_AGENT_HOME" &&
+  MANTLE_AA_EXPORT_PASSWORD=$(cat "$DEMO_AGENT_PASSWORD_FILE") \
+  mantle-aa session export --agent trader --out "$MANTLE_MEME_AGENT_HOME"
+```
+
+看到这个就对了：输出的 JSON 里有 `"role": "agent"`，`keyHash` 和上一块的一样。
+
+不对？先查这个：`no such file` 之类的密码文件错误，说明 `DEMO_AGENT_PASSWORD_FILE` 没设；设好后只重跑这一块。
+
+启动整个演示：
+
+```bash
+scripts/demo-up.sh
+```
+
+看到这个就对了：最后一行和第 1 步一样。之后在 Telegram 问余额和额度，剩余额度回到 50 mUSD。
+
+不对？先查这个：`no exported agent home`，说明上一块没成功，回到上一块。
 
 为什么要清空 agent home：`session export` 拒绝写入一个 agent 用过的目录，报
 `… is neither new, empty nor an earlier export of trader; export into a new or empty directory`。
