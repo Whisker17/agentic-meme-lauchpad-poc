@@ -77,8 +77,12 @@ if [ "${DEMO_FORK:-}" = 1 ]; then
   printf '%s\n' "test test test test test test test test test test test junk" >"$STATE/fork.mnemonic"
   DEMO_RELAYER_KEY_FILE=$STATE/fork-relayer.key
   MARKET_SIM_MNEMONIC_FILE=$STATE/fork.mnemonic
+  # The fork sponsor's own ledger: its nonce records are only valid for the fork they were made on.
+  DB=sponsor-fork.sqlite
   if ! running anvil anvil; then
     command -v anvil >/dev/null || die "DEMO_FORK=1 needs anvil (Foundry)"
+    running sponsor "sponsor serve" && die "a sponsor is still running without the fork; run scripts/demo-down.sh first"
+    rm -f "$STATE/$DB" "$STATE/$DB-wal" "$STATE/$DB-shm"
     say "starting an anvil fork of $RPC on 127.0.0.1:8545"
     (cd "$STATE" || exit; nohup anvil --fork-url "$RPC" --port 8545 --hardfork prague >anvil.log 2>&1 &
       echo $! >anvil.pid)
@@ -86,6 +90,7 @@ if [ "${DEMO_FORK:-}" = 1 ]; then
   fi
   RPC=http://127.0.0.1:8545
 else
+  DB=sponsor.sqlite
   # The public RPC refuses bursts of calls (rate limit): everything reaches it through a local relay
   # that forwards at most 4 calls at a time and retries refused ones.
   if ! running rpc-relay rpc-relay; then
@@ -117,7 +122,7 @@ else
 chainId: 5003
 rpcUrl: $RPC
 listen: { host: 127.0.0.1, port: $PORT }
-database: $STATE/sponsor.sqlite
+database: $STATE/$DB
 relayer: "$relayer"
 relayerKey: \${DEMO_RELAYER_KEY}
 settleTimeoutSeconds: 60
