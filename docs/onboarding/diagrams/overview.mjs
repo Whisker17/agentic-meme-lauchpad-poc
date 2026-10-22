@@ -35,7 +35,7 @@ export const skeleton = [
   ...step(250, "LLM + mantle-meme skill", "SKILL.md：规则 + 命令表 + 退出码话术"),
   down(330, 402),
   ...band(366, 248, "LAUNCHPAD 层"),
-  ...step(402, "mantle-meme CLI", "agent 唯一的工具；--json 输出，退出码"),
+  ...step(402, "mantle-meme CLI", "skill 只让 agent 用它；--json 输出，退出码"),
   down(482, 512),
   ...step(512, "meme-sdk", "报价 · 批次 · 发送锁 · journal"),
   rect(456, 440, 180, 116, {

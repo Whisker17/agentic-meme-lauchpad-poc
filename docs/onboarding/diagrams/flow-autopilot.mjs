@@ -36,7 +36,7 @@ const push = (y, t) => [
     ],
     { dashed: true, stroke: C.muted },
   ),
-  text(right("tg") + 16, y - 26, t, { size: 15, color: C.muted }),
+  text(right("tg") + 16, y - 26, t, { size: 16, color: C.muted }),
 ];
 const phase = (y, t) => [
   line(
@@ -131,7 +131,7 @@ export const skeleton = [
     ],
     { stroke: C.text },
   ),
-  text(430, 806, "人的操作，不经过 agent", { size: 15, color: C.muted }),
+  text(430, 806, "人的操作，不经过 agent", { size: 16, color: C.muted }),
   at("chain", 798, 84, "大额买入，价格上涨\n→ Trade 事件"),
   at(
     "daemon",

@@ -72,7 +72,7 @@ export const skeleton = [
     ],
     { dashed: true, stroke: C.muted },
   ),
-  tag(650, 200, "下一个 tick 读链上状态", C.muted, 15),
+  tag(650, 200, "下一个 tick 读链上状态", C.muted, 16),
   at(
     "daemon",
     276,

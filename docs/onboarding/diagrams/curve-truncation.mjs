@@ -29,9 +29,9 @@ export const skeleton = [
     ],
     { stroke: C.muted, sw: 2 },
   ),
-  ...[0, 200, 400, 600, 800].map((s) => tag(px(s) - 12, Y0 + 10, String(s), C.tag, 16)),
+  ...[0, 200, 400, 600, 800].map((s) => tag(px(s) - 12, Y0 + 10, String(s), C.tag, 17)),
   tag(px(1000) - 140, Y0 + 36, "已卖出（百万枚）", C.muted, 17),
-  ...[1, 4, 9, 16].map((m) => tag(X0 - 52, py(m) - 10, `×${m}`, C.tag, 16)),
+  ...[1, 4, 9, 16].map((m) => tag(X0 - 52, py(m) - 10, `×${m}`, C.tag, 17)),
   tag(0, 60, "价格（相对发射价）", C.muted, 17),
 
   // the curve and the reserve
@@ -44,7 +44,7 @@ export const skeleton = [
     dashed: true,
   }),
   text(px(800) + 20, 300, "预留 2 亿枚\n给将来的“毕业”\n本版没有任何\n代码能动它", {
-    size: 16,
+    size: 17,
     color: C.tag,
     lh: 1.4,
   }),
@@ -53,18 +53,18 @@ export const skeleton = [
   ...box(
     130,
     180,
-    330,
+    390,
     132,
     "恒定乘积 + 虚拟储备",
     "vQ · vT = k（取整永远偏向曲线）\n起点 vT = 1,066,666,667 枚，vQ = 200 mUSD\n价格 = vQ / vT",
     {
       ts: 20,
-      ss: 16,
+      ss: 17,
       stroke: C.line,
     },
   ),
   text(px(0) + 16, py(1) - 74, "起点：每枚 ≈ 1.875 × 10⁻⁷ mUSD\n10 亿枚的估值 ≈ 187.5 mUSD", {
-    size: 16,
+    size: 17,
     color: C.muted,
   }),
   text(
@@ -72,7 +72,7 @@ export const skeleton = [
     py(16) - 6,
     "终点：价格 ×16，vQ = 800 mUSD\n买满大约 606 mUSD（含 1% 手续费）",
     {
-      size: 16,
+      size: 17,
       color: C.text,
     },
   ),
@@ -90,7 +90,7 @@ export const skeleton = [
     910,
     404,
     "SDK 平时先把 approve 和 buy 的 amountIn\n都夹到 amountInUsed：hook 会拒绝超过\n剩余额度的 approve。链上截断只兜底\n“报价之后、上链之前有人插队”的情况。",
-    { size: 16, color: C.muted, lh: 1.45 },
+    { size: 17, color: C.muted, lh: 1.45 },
   ),
   ...box(
     910,
@@ -101,7 +101,7 @@ export const skeleton = [
     "买和卖都 revert（exit 40）。手里的仓位卖不掉：\n是“搁浅”，不是“毕业”。",
     {
       ts: 19,
-      ss: 16,
+      ss: 17,
       stroke: C.accent,
       sw: 3,
     },

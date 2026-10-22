@@ -16,6 +16,10 @@ export const C = {
 export const FONT = 2; // Helvetica; CJK falls back to the system font (PingFang SC / Noto Sans SC)
 
 let n = 0;
+/** Restarts ids and seeds, so a diagram renders the same whichever diagrams render before it. */
+export const resetIds = () => {
+  n = 0;
+};
 const uid = (p) => `${p}-${++n}`;
 // A fixed seed per element keeps the hand-drawn strokes identical across renders.
 const seed = () => 1000 + n * 7919;

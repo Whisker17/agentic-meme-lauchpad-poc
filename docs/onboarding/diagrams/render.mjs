@@ -13,6 +13,7 @@ import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { resetIds } from "./lib.mjs";
 
 const VERSION = "0.18.0"; // @excalidraw/excalidraw
 const here = dirname(fileURLToPath(import.meta.url));
@@ -89,6 +90,7 @@ window.__ready = true;
   let html = readFileSync(page, "utf8");
   for (const src of files) {
     const name = basename(src, ".mjs");
+    resetIds();
     const {
       skeleton,
       alt,

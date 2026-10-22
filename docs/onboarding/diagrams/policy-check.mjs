@@ -3,7 +3,7 @@ import { arrow, box, C, rect, tag, text } from "./lib.mjs";
 
 export const alt =
   "一笔 agent 批次要过三道关。前两道是链下的：AA SDK 在本地按 hook 的规则预检并 eth_call 模拟，不通过就不发送（退出码 10、11、12、13）；" +
-  "sponsor 自己鉴权、查 allowlist、再模拟一遍，但它不是安全边界。第三道在链上，是唯一的强制点：Calibur 对批次里的每一个调用，" +
+  "sponsor 自己鉴权、查 allowlist、再模拟一遍，但它不是安全边界。第三道在链上，是交易权限唯一的强制点：Calibur 对批次里的每一个调用，" +
   "先调 AgentPolicyHook.beforeExecute（会话是否有效、目标不是 hook、目标和函数选择器在白名单里、按规则检查 approve 的 spender 和额度、" +
   "买卖的 recipient 必须是账户本身、deadline 在 600 秒窗口内、卖出不超过这把 key 的 inventory），再执行调用，" +
   "最后调 afterExecute（调用失败就回滚、MockUSD 净流出计入总额和每日额度、买入的 token 记进 inventory、卖出必须足额）。任何一步失败，整笔交易回滚。";
@@ -12,7 +12,7 @@ const gate = (x, title, sub, o = {}) => box(x, 30, 370, 140, title, sub, { ts: 2
 const L = (x, y, t, o = {}) => text(x, y, t, { size: 17, color: C.muted, lh: 1.5, ...o });
 
 export const skeleton = [
-  tag(0, 0, "三道关：前两道只让坏请求早点失败，第三道才是边界", C.muted, 19),
+  tag(0, 0, "三道关：前两道只让坏请求早点失败，第三道才是交易权限的边界", C.muted, 19),
   ...gate(
     0,
     "① AA SDK · simulate（本地）",
@@ -35,7 +35,7 @@ export const skeleton = [
   ...gate(
     830,
     "③ 链上 · Calibur + AgentPolicyHook",
-    "唯一的强制点。\n就算 agent 绕过 SDK 和 sponsor\n直接调账户，规则一样生效",
+    "交易权限唯一的强制点。\n就算 agent 绕过 SDK 和 sponsor\n直接调账户，规则一样生效",
     { stroke: C.accent, sw: 3 },
   ),
 

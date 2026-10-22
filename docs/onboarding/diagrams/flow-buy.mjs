@@ -44,7 +44,7 @@ const msg = (a, b, y, label, o = {}) => {
 const note = (k, y, h, t, o = {}) =>
   rect(X[k] - (o.w || 190) / 2 + (o.dx || 0), y, o.w || 190, h, {
     label: t,
-    size: 15,
+    size: 16,
     stroke: o.stroke || C.line,
     bg: C.fill,
     color: o.color || C.muted,

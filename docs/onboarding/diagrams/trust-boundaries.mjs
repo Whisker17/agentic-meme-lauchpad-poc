@@ -4,8 +4,8 @@ import { arrow, C, rect, tag, text } from "./lib.mjs";
 export const alt =
   "信任边界图。左边是进入 agent 的输入：你的 Telegram 消息（只接受你的 chat id）、任何人都能写的链上代币名称和描述、" +
   "list 和 info 等命令输出、模型提供方的回复。中间三层，从软到硬：skill 规则只约束守规矩的模型，prompt injection 可以让它违反任何一条；" +
-  "容器隔离限制 agent 能拿到哪些钥匙（没有 root key、没有 docker socket），但容器里的 agent 密码、bot token 和模型登录它都读得到；" +
-  "链上强制（Calibur、AgentPolicyHook、MemeLaunchpad）即使 agent 被完全控制也成立：五个函数的白名单、MockUSD 总额和每日额度、" +
+  "容器是凭据隔离边界，决定 agent 能拿到哪些钥匙（没有 root key、没有 docker socket），但不限制它已经拿到的 session key 能做什么，容器里的 agent 密码、bot token 和模型登录它也都读得到；" +
+  "链上强制（Calibur、AgentPolicyHook、MemeLaunchpad）是交易权限的强制边界，即使 agent 被完全控制也成立：五个函数的白名单、MockUSD 总额和每日额度、" +
   "只能卖自己买的、收款人必须是账户、deadline 不超过 600 秒、24 小时过期、撤销是墓碑。右边列出被攻破的 agent 还能做和做不到的事。";
 
 const band = (y, h, title, body, note, o = {}) => [
@@ -47,7 +47,7 @@ export const skeleton = [
     178,
     "② 容器隔离 · Docker",
     "只挂 OpenClaw 状态、agent home、skills（只读）\n没有 root key、没有 ~/.mantle-aa、没有 docker socket\n但容器里的 agent 密码、bot token、模型登录，它都读得到",
-    "它限制 agent 拿得到哪把钥匙，不限制钥匙能做什么。",
+    "凭据隔离边界：拿不到 root key，但不限制 session key 能做什么。",
     { stroke: C.muted },
   ),
   ...band(
@@ -55,7 +55,7 @@ export const skeleton = [
     214,
     "③ 链上强制 · Calibur + AgentPolicyHook + MemeLaunchpad",
     "白名单：approve、buy、sell、createToken、claimCreatorFees\nMockUSD 总额 + 每日额度 · 只能卖这把 key 买到的\n收款人必须是账户 · deadline ≤ 600 s · 24 h 过期 · 撤销 = 墓碑\nLaunchpad 无 owner、参数不可变、只从调用者拉钱",
-    "agent 被完全控制，这一层照样成立。",
+    "交易权限的强制边界：agent 被完全控制，这一层照样成立。",
     { stroke: C.accent, sw: 3, noteColor: C.accent },
   ),
   arrow(

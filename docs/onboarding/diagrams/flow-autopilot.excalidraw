@@ -4,7 +4,7 @@
   "source": "https://excalidraw.com",
   "elements": [
     {
-      "id": "r-155",
+      "id": "r-1",
       "type": "rectangle",
       "x": 0,
       "y": 0,
@@ -24,22 +24,22 @@
       "roundness": {
         "type": 3
       },
-      "seed": 1220526,
+      "seed": 1000,
       "version": 2,
-      "versionNonce": 436254425,
+      "versionNonce": 363746575,
       "isDeleted": false,
       "boundElements": [
         {
           "type": "text",
-          "id": "Z6-_eWkv7Ru0Gq6OttC0m"
+          "id": "0qMkg6YnlnecxHDVoM-uy"
         }
       ],
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false
     },
     {
-      "id": "r-156",
+      "id": "r-2",
       "type": "rectangle",
       "x": 220,
       "y": 0,
@@ -59,22 +59,22 @@
       "roundness": {
         "type": 3
       },
-      "seed": 1228445,
+      "seed": 8919,
       "version": 2,
-      "versionNonce": 212696887,
+      "versionNonce": 584615777,
       "isDeleted": false,
       "boundElements": [
         {
           "type": "text",
-          "id": "aoOmsvmmVB9ey-bx14XGl"
+          "id": "InAjwtP1PkWXSpj36zJfQ"
         }
       ],
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false
     },
     {
-      "id": "r-157",
+      "id": "r-3",
       "type": "rectangle",
       "x": 432,
       "y": 0,
@@ -94,22 +94,22 @@
       "roundness": {
         "type": 3
       },
-      "seed": 1236364,
+      "seed": 16838,
       "version": 2,
-      "versionNonce": 2119594937,
+      "versionNonce": 2053036847,
       "isDeleted": false,
       "boundElements": [
         {
           "type": "text",
-          "id": "ZOCo1xpYeamvMnHMPr5T0"
+          "id": "qIGA5yvOxlgNOn-m4iso1"
         }
       ],
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false
     },
     {
-      "id": "r-158",
+      "id": "r-4",
       "type": "rectangle",
       "x": 716,
       "y": 0,
@@ -129,22 +129,22 @@
       "roundness": {
         "type": 3
       },
-      "seed": 1244283,
+      "seed": 24757,
       "version": 2,
-      "versionNonce": 256278615,
+      "versionNonce": 66253633,
       "isDeleted": false,
       "boundElements": [
         {
           "type": "text",
-          "id": "8WSqkMzEeeXt8yq30CgT4"
+          "id": "-HeNfzpYFQlb8rpzOHr3Y"
         }
       ],
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false
     },
     {
-      "id": "r-159",
+      "id": "r-5",
       "type": "rectangle",
       "x": 1090,
       "y": 0,
@@ -164,22 +164,22 @@
       "roundness": {
         "type": 3
       },
-      "seed": 1252202,
+      "seed": 32676,
       "version": 2,
-      "versionNonce": 1319212185,
+      "versionNonce": 525966671,
       "isDeleted": false,
       "boundElements": [
         {
           "type": "text",
-          "id": "Az4wW6UjH4-ZUJproCFwg"
+          "id": "3UOKIa6Rge9KFZKnsdUzM"
         }
       ],
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false
     },
     {
-      "id": "a-160",
+      "id": "a-6",
       "type": "line",
       "x": 0,
       "y": 70,
@@ -197,12 +197,12 @@
       "frameId": null,
       "index": "a5",
       "roundness": null,
-      "seed": 1260121,
+      "seed": 40595,
       "version": 2,
-      "versionNonce": 358767991,
+      "versionNonce": 1385489185,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false,
       "points": [
@@ -222,7 +222,7 @@
       "endArrowhead": null
     },
     {
-      "id": "t-161",
+      "id": "t-7",
       "type": "text",
       "x": 0,
       "y": 76,
@@ -240,12 +240,12 @@
       "frameId": null,
       "index": "a6",
       "roundness": null,
-      "seed": 1268040,
+      "seed": 48514,
       "version": 2,
-      "versionNonce": 781556089,
+      "versionNonce": 2012683119,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false,
       "text": "启动",
@@ -259,7 +259,7 @@
       "lineHeight": 1.3
     },
     {
-      "id": "r-162",
+      "id": "r-8",
       "type": "rectangle",
       "x": 0,
       "y": 100,
@@ -279,22 +279,22 @@
       "roundness": {
         "type": 3
       },
-      "seed": 1275959,
+      "seed": 56433,
       "version": 2,
-      "versionNonce": 1648727703,
+      "versionNonce": 2066601729,
       "isDeleted": false,
       "boundElements": [
         {
           "type": "text",
-          "id": "XAgYTbkblJvNhIjrmYq8u"
+          "id": "g4S5a8uMC6AfNqZI5QqkY"
         }
       ],
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false
     },
     {
-      "id": "a-163",
+      "id": "a-9",
       "type": "arrow",
       "x": 204,
       "y": 148,
@@ -312,12 +312,12 @@
       "frameId": null,
       "index": "a8",
       "roundness": null,
-      "seed": 1283878,
+      "seed": 64352,
       "version": 2,
-      "versionNonce": 2138440281,
+      "versionNonce": 2021643663,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false,
       "points": [
@@ -338,7 +338,7 @@
       "elbowed": false
     },
     {
-      "id": "r-164",
+      "id": "r-10",
       "type": "rectangle",
       "x": 432,
       "y": 100,
@@ -358,22 +358,22 @@
       "roundness": {
         "type": 3
       },
-      "seed": 1291797,
+      "seed": 72271,
       "version": 2,
-      "versionNonce": 1554295735,
+      "versionNonce": 809324257,
       "isDeleted": false,
       "boundElements": [
         {
           "type": "text",
-          "id": "QpVBWx3uHTjzR5cznuH8m"
+          "id": "3WMSGPg6oeRx3-jfChaQH"
         }
       ],
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false
     },
     {
-      "id": "r-165",
+      "id": "r-11",
       "type": "rectangle",
       "x": 0,
       "y": 228,
@@ -393,22 +393,22 @@
       "roundness": {
         "type": 3
       },
-      "seed": 1299716,
+      "seed": 80190,
       "version": 2,
-      "versionNonce": 773214009,
+      "versionNonce": 2016168879,
       "isDeleted": false,
       "boundElements": [
         {
           "type": "text",
-          "id": "5R9HYxbZB3im9h-KKzMc4"
+          "id": "y6LjlbmK3u5fTIOTCB658"
         }
       ],
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false
     },
     {
-      "id": "a-166",
+      "id": "a-12",
       "type": "arrow",
       "x": 204,
       "y": 253,
@@ -426,12 +426,12 @@
       "frameId": null,
       "index": "aB",
       "roundness": null,
-      "seed": 1307635,
+      "seed": 88109,
       "version": 2,
-      "versionNonce": 547626199,
+      "versionNonce": 676514497,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false,
       "points": [
@@ -452,7 +452,7 @@
       "elbowed": false
     },
     {
-      "id": "r-167",
+      "id": "r-13",
       "type": "rectangle",
       "x": 432,
       "y": 228,
@@ -472,22 +472,22 @@
       "roundness": {
         "type": 3
       },
-      "seed": 1315554,
+      "seed": 96028,
       "version": 2,
-      "versionNonce": 1088028697,
+      "versionNonce": 1394933199,
       "isDeleted": false,
       "boundElements": [
         {
           "type": "text",
-          "id": "wB_8r4CnZvdQ5I-ospfWV"
+          "id": "chBu4D7N00PS4uKklTHoK"
         }
       ],
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false
     },
     {
-      "id": "a-168",
+      "id": "a-14",
       "type": "arrow",
       "x": 698,
       "y": 274,
@@ -505,12 +505,12 @@
       "frameId": null,
       "index": "aD",
       "roundness": null,
-      "seed": 1323473,
+      "seed": 103947,
       "version": 2,
-      "versionNonce": 1373137399,
+      "versionNonce": 470665889,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false,
       "points": [
@@ -531,7 +531,7 @@
       "elbowed": false
     },
     {
-      "id": "r-169",
+      "id": "r-15",
       "type": "rectangle",
       "x": 716,
       "y": 228,
@@ -551,22 +551,22 @@
       "roundness": {
         "type": 3
       },
-      "seed": 1331392,
+      "seed": 111866,
       "version": 2,
-      "versionNonce": 632591609,
+      "versionNonce": 1283615727,
       "isDeleted": false,
       "boundElements": [
         {
           "type": "text",
-          "id": "E8A6yN7DWskIiBTfIVYK0"
+          "id": "WsZFZU61NiVPtym-5dr72"
         }
       ],
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false
     },
     {
-      "id": "a-170",
+      "id": "a-16",
       "type": "arrow",
       "x": 712,
       "y": 400,
@@ -584,12 +584,12 @@
       "frameId": null,
       "index": "aF",
       "roundness": null,
-      "seed": 1339311,
+      "seed": 119785,
       "version": 2,
-      "versionNonce": 759567127,
+      "versionNonce": 69062273,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false,
       "points": [
@@ -610,12 +610,12 @@
       "elbowed": false
     },
     {
-      "id": "t-171",
+      "id": "t-17",
       "type": "text",
       "x": 216,
       "y": 374,
-      "width": 365.93994140625,
-      "height": 19.5,
+      "width": 390.3359375,
+      "height": 20.8,
       "angle": 0,
       "strokeColor": "#B8C6BE",
       "backgroundColor": "transparent",
@@ -628,16 +628,16 @@
       "frameId": null,
       "index": "aG",
       "roundness": null,
-      "seed": 1347230,
+      "seed": 127704,
       "version": 2,
-      "versionNonce": 1076465113,
+      "versionNonce": 810358287,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false,
       "text": "Bot API 直接推送：Autopilot started …（不经过 LLM）",
-      "fontSize": 15,
+      "fontSize": 16,
       "fontFamily": 2,
       "textAlign": "left",
       "verticalAlign": "top",
@@ -647,7 +647,7 @@
       "lineHeight": 1.3
     },
     {
-      "id": "a-172",
+      "id": "a-18",
       "type": "line",
       "x": 0,
       "y": 430,
@@ -665,12 +665,12 @@
       "frameId": null,
       "index": "aH",
       "roundness": null,
-      "seed": 1355149,
+      "seed": 135623,
       "version": 2,
-      "versionNonce": 1533122615,
+      "versionNonce": 390223457,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false,
       "points": [
@@ -690,7 +690,7 @@
       "endArrowhead": null
     },
     {
-      "id": "t-173",
+      "id": "t-19",
       "type": "text",
       "x": 0,
       "y": 436,
@@ -708,12 +708,12 @@
       "frameId": null,
       "index": "aI",
       "roundness": null,
-      "seed": 1363068,
+      "seed": 143542,
       "version": 2,
-      "versionNonce": 927754937,
+      "versionNonce": 897416239,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false,
       "text": "买入",
@@ -727,7 +727,7 @@
       "lineHeight": 1.3
     },
     {
-      "id": "r-174",
+      "id": "r-20",
       "type": "rectangle",
       "x": 1090,
       "y": 462,
@@ -747,22 +747,22 @@
       "roundness": {
         "type": 3
       },
-      "seed": 1370987,
+      "seed": 151461,
       "version": 2,
-      "versionNonce": 34568535,
+      "versionNonce": 139125313,
       "isDeleted": false,
       "boundElements": [
         {
           "type": "text",
-          "id": "hEbt_mU1Gg77tfjcPVBLV"
+          "id": "XiAIlUG8xeGVYmDyseyzU"
         }
       ],
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false
     },
     {
-      "id": "a-175",
+      "id": "a-21",
       "type": "arrow",
       "x": 1086,
       "y": 504,
@@ -780,12 +780,12 @@
       "frameId": null,
       "index": "aK",
       "roundness": null,
-      "seed": 1378906,
+      "seed": 159380,
       "version": 2,
-      "versionNonce": 62958489,
+      "versionNonce": 536616527,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false,
       "points": [
@@ -806,7 +806,7 @@
       "elbowed": false
     },
     {
-      "id": "r-176",
+      "id": "r-22",
       "type": "rectangle",
       "x": 716,
       "y": 462,
@@ -826,22 +826,22 @@
       "roundness": {
         "type": 3
       },
-      "seed": 1386825,
+      "seed": 167299,
       "version": 2,
-      "versionNonce": 379860599,
+      "versionNonce": 68612641,
       "isDeleted": false,
       "boundElements": [
         {
           "type": "text",
-          "id": "wLbMuia7sHHUw4qMzT3wy"
+          "id": "mBeuoLsvvSKSr4mAJ72So"
         }
       ],
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false
     },
     {
-      "id": "r-177",
+      "id": "r-23",
       "type": "rectangle",
       "x": 716,
       "y": 608,
@@ -861,22 +861,22 @@
       "roundness": {
         "type": 3
       },
-      "seed": 1394744,
+      "seed": 175218,
       "version": 2,
-      "versionNonce": 1035587705,
+      "versionNonce": 581008495,
       "isDeleted": false,
       "boundElements": [
         {
           "type": "text",
-          "id": "lT7ffJBlBZhmp-EsyEqX6"
+          "id": "pYfyl9985jT9r6QF5Zqre"
         }
       ],
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false
     },
     {
-      "id": "a-178",
+      "id": "a-24",
       "type": "arrow",
       "x": 1072,
       "y": 654,
@@ -894,12 +894,12 @@
       "frameId": null,
       "index": "aN",
       "roundness": null,
-      "seed": 1402663,
+      "seed": 183137,
       "version": 2,
-      "versionNonce": 1877233559,
+      "versionNonce": 1872102913,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false,
       "points": [
@@ -920,7 +920,7 @@
       "elbowed": false
     },
     {
-      "id": "r-179",
+      "id": "r-25",
       "type": "rectangle",
       "x": 1090,
       "y": 608,
@@ -940,22 +940,22 @@
       "roundness": {
         "type": 3
       },
-      "seed": 1410582,
+      "seed": 191056,
       "version": 2,
-      "versionNonce": 721115481,
+      "versionNonce": 20321935,
       "isDeleted": false,
       "boundElements": [
         {
           "type": "text",
-          "id": "_rk7wUC-ngz4lp8hJTNgW"
+          "id": "iRIzHyq5zjmARnxsDFouz"
         }
       ],
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false
     },
     {
-      "id": "a-180",
+      "id": "a-26",
       "type": "arrow",
       "x": 712,
       "y": 736,
@@ -973,12 +973,12 @@
       "frameId": null,
       "index": "aP",
       "roundness": null,
-      "seed": 1418501,
+      "seed": 198975,
       "version": 2,
-      "versionNonce": 402932919,
+      "versionNonce": 1707580897,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false,
       "points": [
@@ -999,12 +999,12 @@
       "elbowed": false
     },
     {
-      "id": "t-181",
+      "id": "t-27",
       "type": "text",
       "x": 216,
       "y": 710,
-      "width": 283.41796875,
-      "height": 19.5,
+      "width": 302.3125,
+      "height": 20.8,
       "angle": 0,
       "strokeColor": "#B8C6BE",
       "backgroundColor": "transparent",
@@ -1017,16 +1017,16 @@
       "frameId": null,
       "index": "aQ",
       "roundness": null,
-      "seed": 1426420,
+      "seed": 206894,
       "version": 2,
-      "versionNonce": 215533113,
+      "versionNonce": 1920101551,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false,
       "text": "推送 Bought ZORK: 3 mUSD → … tokens.",
-      "fontSize": 15,
+      "fontSize": 16,
       "fontFamily": 2,
       "textAlign": "left",
       "verticalAlign": "top",
@@ -1036,7 +1036,7 @@
       "lineHeight": 1.3
     },
     {
-      "id": "a-182",
+      "id": "a-28",
       "type": "line",
       "x": 0,
       "y": 766,
@@ -1054,12 +1054,12 @@
       "frameId": null,
       "index": "aR",
       "roundness": null,
-      "seed": 1434339,
+      "seed": 214813,
       "version": 2,
-      "versionNonce": 1588106711,
+      "versionNonce": 1975204289,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false,
       "points": [
@@ -1079,7 +1079,7 @@
       "endArrowhead": null
     },
     {
-      "id": "t-183",
+      "id": "t-29",
       "type": "text",
       "x": 0,
       "y": 772,
@@ -1097,12 +1097,12 @@
       "frameId": null,
       "index": "aS",
       "roundness": null,
-      "seed": 1442258,
+      "seed": 222732,
       "version": 2,
-      "versionNonce": 775264025,
+      "versionNonce": 1107230415,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false,
       "text": "止盈",
@@ -1116,7 +1116,7 @@
       "lineHeight": 1.3
     },
     {
-      "id": "r-184",
+      "id": "r-30",
       "type": "rectangle",
       "x": 220,
       "y": 798,
@@ -1136,22 +1136,22 @@
       "roundness": {
         "type": 3
       },
-      "seed": 1450177,
+      "seed": 230651,
       "version": 2,
-      "versionNonce": 719700727,
+      "versionNonce": 546331041,
       "isDeleted": false,
       "boundElements": [
         {
           "type": "text",
-          "id": "FpE4w-EW_wuyyakMrEwPh"
+          "id": "nXsauWzcvetmUyF39ZOMV"
         }
       ],
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false
     },
     {
-      "id": "a-185",
+      "id": "a-31",
       "type": "arrow",
       "x": 414,
       "y": 840,
@@ -1169,12 +1169,12 @@
       "frameId": null,
       "index": "aU",
       "roundness": null,
-      "seed": 1458096,
+      "seed": 238570,
       "version": 2,
-      "versionNonce": 830819321,
+      "versionNonce": 846482671,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false,
       "points": [
@@ -1195,12 +1195,12 @@
       "elbowed": false
     },
     {
-      "id": "t-186",
+      "id": "t-32",
       "type": "text",
       "x": 430,
       "y": 806,
-      "width": 161.7041015625,
-      "height": 19.5,
+      "width": 172.484375,
+      "height": 20.8,
       "angle": 0,
       "strokeColor": "#B8C6BE",
       "backgroundColor": "transparent",
@@ -1213,16 +1213,16 @@
       "frameId": null,
       "index": "aV",
       "roundness": null,
-      "seed": 1466015,
+      "seed": 246489,
       "version": 2,
-      "versionNonce": 222317591,
+      "versionNonce": 393641345,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false,
       "text": "人的操作，不经过 agent",
-      "fontSize": 15,
+      "fontSize": 16,
       "fontFamily": 2,
       "textAlign": "left",
       "verticalAlign": "top",
@@ -1232,7 +1232,7 @@
       "lineHeight": 1.3
     },
     {
-      "id": "r-187",
+      "id": "r-33",
       "type": "rectangle",
       "x": 1090,
       "y": 798,
@@ -1252,22 +1252,22 @@
       "roundness": {
         "type": 3
       },
-      "seed": 1473934,
+      "seed": 254408,
       "version": 2,
-      "versionNonce": 516646105,
+      "versionNonce": 526046991,
       "isDeleted": false,
       "boundElements": [
         {
           "type": "text",
-          "id": "kU7nBPmYKQ9D7bEYJyAe2"
+          "id": "GmvbhpEDtdHtnHwdhIbZO"
         }
       ],
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false
     },
     {
-      "id": "r-188",
+      "id": "r-34",
       "type": "rectangle",
       "x": 716,
       "y": 896,
@@ -1287,22 +1287,22 @@
       "roundness": {
         "type": 3
       },
-      "seed": 1481853,
+      "seed": 262327,
       "version": 2,
-      "versionNonce": 296530231,
+      "versionNonce": 967648609,
       "isDeleted": false,
       "boundElements": [
         {
           "type": "text",
-          "id": "3bbutyDKi7nyfUTj1Z6Ub"
+          "id": "jq5u5PARogfxApKha4HRd"
         }
       ],
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false
     },
     {
-      "id": "a-189",
+      "id": "a-35",
       "type": "arrow",
       "x": 1088,
       "y": 882,
@@ -1320,12 +1320,12 @@
       "frameId": null,
       "index": "aY",
       "roundness": null,
-      "seed": 1489772,
+      "seed": 270246,
       "version": 2,
-      "versionNonce": 832266681,
+      "versionNonce": 1596661039,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false,
       "points": [
@@ -1346,7 +1346,7 @@
       "elbowed": false
     },
     {
-      "id": "a-190",
+      "id": "a-36",
       "type": "arrow",
       "x": 712,
       "y": 1030,
@@ -1364,12 +1364,12 @@
       "frameId": null,
       "index": "aZ",
       "roundness": null,
-      "seed": 1497691,
+      "seed": 278165,
       "version": 2,
-      "versionNonce": 1368355415,
+      "versionNonce": 1384370497,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false,
       "points": [
@@ -1390,12 +1390,12 @@
       "elbowed": false
     },
     {
-      "id": "t-191",
+      "id": "t-37",
       "type": "text",
       "x": 216,
       "y": 1004,
-      "width": 316.73583984375,
-      "height": 19.5,
+      "width": 337.8515625,
+      "height": 20.8,
       "angle": 0,
       "strokeColor": "#B8C6BE",
       "backgroundColor": "transparent",
@@ -1408,16 +1408,16 @@
       "frameId": null,
       "index": "aa",
       "roundness": null,
-      "seed": 1505610,
+      "seed": 286084,
       "version": 2,
-      "versionNonce": 1729675929,
+      "versionNonce": 1699585871,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false,
       "text": "推送 Sold ZORK (take-profit): … PnL … mUSD.",
-      "fontSize": 15,
+      "fontSize": 16,
       "fontFamily": 2,
       "textAlign": "left",
       "verticalAlign": "top",
@@ -1427,7 +1427,7 @@
       "lineHeight": 1.3
     },
     {
-      "id": "r-192",
+      "id": "r-38",
       "type": "rectangle",
       "x": 0,
       "y": 1066,
@@ -1447,17 +1447,17 @@
       "roundness": {
         "type": 3
       },
-      "seed": 1513529,
+      "seed": 294003,
       "version": 2,
-      "versionNonce": 1170018167,
+      "versionNonce": 391774497,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false
     },
     {
-      "id": "t-193",
+      "id": "t-39",
       "type": "text",
       "x": 18,
       "y": 1080,
@@ -1475,12 +1475,12 @@
       "frameId": null,
       "index": "ac",
       "roundness": null,
-      "seed": 1521448,
+      "seed": 301922,
       "version": 2,
-      "versionNonce": 1274480505,
+      "versionNonce": 605740399,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480977,
+      "updated": 1792646773178,
       "link": null,
       "locked": false,
       "text": "崩溃恢复：daemon 在“交易已上链、还没存盘”时被杀怎么办？\n重启时读 state.json 的 pending.id，去 journal 找 correlationId = id 的记录：有就补记（开仓 / 标记已止盈 / 平仓），\n没有就当这笔没发生。手动交易不带 id，永远不会被当成 autopilot 的交易。",
@@ -1494,7 +1494,7 @@
       "lineHeight": 1.5
     },
     {
-      "id": "Z6-_eWkv7Ru0Gq6OttC0m",
+      "id": "0qMkg6YnlnecxHDVoM-uy",
       "type": "text",
       "x": 46.4833984375,
       "y": 17.65,
@@ -1512,12 +1512,12 @@
       "frameId": null,
       "index": "ad",
       "roundness": null,
-      "seed": 1484392599,
+      "seed": 1704932609,
       "version": 3,
-      "versionNonce": 112005047,
+      "versionNonce": 594316001,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480979,
+      "updated": 1792646773179,
       "link": null,
       "locked": false,
       "text": "你 · Telegram",
@@ -1525,13 +1525,13 @@
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "r-155",
+      "containerId": "r-1",
       "originalText": "你 · Telegram",
       "autoResize": true,
       "lineHeight": 1.15
     },
     {
-      "id": "aoOmsvmmVB9ey-bx14XGl",
+      "id": "InAjwtP1PkWXSpj36zJfQ",
       "type": "text",
       "x": 262.48974609375,
       "y": 17.65,
@@ -1549,12 +1549,12 @@
       "frameId": null,
       "index": "ae",
       "roundness": null,
-      "seed": 930799031,
+      "seed": 1087565025,
       "version": 3,
-      "versionNonce": 1379281721,
+      "versionNonce": 2141114287,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480979,
+      "updated": 1792646773179,
       "link": null,
       "locked": false,
       "text": "你 · root 终端",
@@ -1562,13 +1562,13 @@
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "r-156",
+      "containerId": "r-2",
       "originalText": "你 · root 终端",
       "autoResize": true,
       "lineHeight": 1.15
     },
     {
-      "id": "ZOCo1xpYeamvMnHMPr5T0",
+      "id": "qIGA5yvOxlgNOn-m4iso1",
       "type": "text",
       "x": 460.44921875,
       "y": 17.65,
@@ -1586,12 +1586,12 @@
       "frameId": null,
       "index": "af",
       "roundness": null,
-      "seed": 1709444823,
+      "seed": 277129409,
       "version": 3,
-      "versionNonce": 872415447,
+      "versionNonce": 1782220481,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480979,
+      "updated": 1792646773179,
       "link": null,
       "locked": false,
       "text": "OpenClaw agent（LLM）",
@@ -1599,13 +1599,13 @@
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "r-157",
+      "containerId": "r-3",
       "originalText": "OpenClaw agent（LLM）",
       "autoResize": true,
       "lineHeight": 1.15
     },
     {
-      "id": "8WSqkMzEeeXt8yq30CgT4",
+      "id": "-HeNfzpYFQlb8rpzOHr3Y",
       "type": "text",
       "x": 751.16845703125,
       "y": 17.65,
@@ -1623,12 +1623,12 @@
       "frameId": null,
       "index": "ag",
       "roundness": null,
-      "seed": 239737847,
+      "seed": 508815521,
       "version": 3,
-      "versionNonce": 211704857,
+      "versionNonce": 1369899471,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480979,
+      "updated": 1792646773179,
       "link": null,
       "locked": false,
       "text": "容器：launcher + autopilot daemon",
@@ -1636,13 +1636,13 @@
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "r-158",
+      "containerId": "r-4",
       "originalText": "容器：launcher + autopilot daemon",
       "autoResize": true,
       "lineHeight": 1.15
     },
     {
-      "id": "Az4wW6UjH4-ZUJproCFwg",
+      "id": "3UOKIa6Rge9KFZKnsdUzM",
       "type": "text",
       "x": 1126.244140625,
       "y": 17.65,
@@ -1660,12 +1660,12 @@
       "frameId": null,
       "index": "ah",
       "roundness": null,
-      "seed": 347178263,
+      "seed": 1408248961,
       "version": 3,
-      "versionNonce": 1477955063,
+      "versionNonce": 1100875425,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480979,
+      "updated": 1792646773179,
       "link": null,
       "locked": false,
       "text": "链 + market-sim",
@@ -1673,13 +1673,13 @@
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "r-159",
+      "containerId": "r-5",
       "originalText": "链 + market-sim",
       "autoResize": true,
       "lineHeight": 1.15
     },
     {
-      "id": "XAgYTbkblJvNhIjrmYq8u",
+      "id": "g4S5a8uMC6AfNqZI5QqkY",
       "type": "text",
       "x": 12.88671875,
       "y": 120.4,
@@ -1697,12 +1697,12 @@
       "frameId": null,
       "index": "ai",
       "roundness": null,
-      "seed": 1754188343,
+      "seed": 957936737,
       "version": 3,
-      "versionNonce": 814575865,
+      "versionNonce": 874770415,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480979,
+      "updated": 1792646773179,
       "link": null,
       "locked": false,
       "text": "“开打新：每个新币 3U，\n涨 50% 卖一半，\n最多拿 30 分钟”",
@@ -1710,13 +1710,13 @@
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "r-162",
+      "containerId": "r-8",
       "originalText": "“开打新：每个新币 3U，\n涨 50% 卖一半，\n最多拿 30 分钟”",
       "autoResize": true,
       "lineHeight": 1.15
     },
     {
-      "id": "QpVBWx3uHTjzR5cznuH8m",
+      "id": "3WMSGPg6oeRx3-jfChaQH",
       "type": "text",
       "x": 451,
       "y": 118.2,
@@ -1734,12 +1734,12 @@
       "frameId": null,
       "index": "aj",
       "roundness": null,
-      "seed": 382102359,
+      "seed": 832421953,
       "version": 3,
-      "versionNonce": 2113468183,
+      "versionNonce": 71731841,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480979,
+      "updated": 1792646773179,
       "link": null,
       "locked": false,
       "text": "写 strategy.json，逐项复述\n（含默认值；无止损、无防夹、\n和手动交易共用额度）\n先不启动",
@@ -1747,13 +1747,13 @@
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "r-164",
+      "containerId": "r-10",
       "originalText": "写 strategy.json，逐项复述\n（含默认值；无止损、无防夹、\n和手动交易共用额度）\n先不启动",
       "autoResize": true,
       "lineHeight": 1.15
     },
     {
-      "id": "5R9HYxbZB3im9h-KKzMc4",
+      "id": "y6LjlbmK3u5fTIOTCB658",
       "type": "text",
       "x": 86.671875,
       "y": 243.8,
@@ -1771,12 +1771,12 @@
       "frameId": null,
       "index": "ak",
       "roundness": null,
-      "seed": 464316535,
+      "seed": 2069762081,
       "version": 3,
-      "versionNonce": 864479705,
+      "versionNonce": 824056335,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480979,
+      "updated": 1792646773179,
       "link": null,
       "locked": false,
       "text": "“是”",
@@ -1784,13 +1784,13 @@
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "r-165",
+      "containerId": "r-11",
       "originalText": "“是”",
       "autoResize": true,
       "lineHeight": 1.15
     },
     {
-      "id": "wB_8r4CnZvdQ5I-ospfWV",
+      "id": "chBu4D7N00PS4uKklTHoK",
       "type": "text",
       "x": 455.3984375,
       "y": 246.4,
@@ -1808,12 +1808,12 @@
       "frameId": null,
       "index": "al",
       "roundness": null,
-      "seed": 1963377047,
+      "seed": 1816749057,
       "version": 3,
-      "versionNonce": 1545075767,
+      "versionNonce": 183734881,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480979,
+      "updated": 1792646773179,
       "link": null,
       "locked": false,
       "text": "autopilot start\n--strategy strategy.json\nwrapper → launcher 的 socket",
@@ -1821,13 +1821,13 @@
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "r-167",
+      "containerId": "r-13",
       "originalText": "autopilot start\n--strategy strategy.json\nwrapper → launcher 的 socket",
       "autoResize": true,
       "lineHeight": 1.15
     },
     {
-      "id": "E8A6yN7DWskIiBTfIVYK0",
+      "id": "WsZFZU61NiVPtym-5dr72",
       "type": "text",
       "x": 734.61328125,
       "y": 257,
@@ -1845,12 +1845,12 @@
       "frameId": null,
       "index": "am",
       "roundness": null,
-      "seed": 1946711735,
+      "seed": 1885289441,
       "version": 3,
-      "versionNonce": 245253817,
+      "versionNonce": 2106458159,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480979,
+      "updated": 1792646773179,
       "link": null,
       "locked": false,
       "text": "launcher 跑真 CLI，CLI 启动分离的 daemon\ndaemon：独占 pid 文件（在 send.lock 下）\n→ 读链上会话状态 → 写 state.json\n→ started 事件 → 经 IPC 回报\nagent 的命令返回，daemon 留下",
@@ -1858,13 +1858,13 @@
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "r-169",
+      "containerId": "r-15",
       "originalText": "launcher 跑真 CLI，CLI 启动分离的 daemon\ndaemon：独占 pid 文件（在 send.lock 下）\n→ 读链上会话状态 → 写 state.json\n→ started 事件 → 经 IPC 回报\nagent 的命令返回，daemon 留下",
       "autoResize": true,
       "lineHeight": 1.15
     },
     {
-      "id": "hEbt_mU1Gg77tfjcPVBLV",
+      "id": "XiAIlUG8xeGVYmDyseyzU",
       "type": "text",
       "x": 1124.22265625,
       "y": 485.6,
@@ -1882,12 +1882,12 @@
       "frameId": null,
       "index": "an",
       "roundness": null,
-      "seed": 1331070935,
+      "seed": 1202657217,
       "version": 3,
-      "versionNonce": 1717132631,
+      "versionNonce": 1786027585,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480979,
+      "updated": 1792646773179,
       "link": null,
       "locked": false,
       "text": "market-sim 发新币\n→ TokenCreated",
@@ -1895,13 +1895,13 @@
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "r-174",
+      "containerId": "r-20",
       "originalText": "market-sim 发新币\n→ TokenCreated",
       "autoResize": true,
       "lineHeight": 1.15
     },
     {
-      "id": "wLbMuia7sHHUw4qMzT3wy",
+      "id": "mBeuoLsvvSKSr4mAJ72So",
       "type": "text",
       "x": 764.9375,
       "y": 482,
@@ -1919,12 +1919,12 @@
       "frameId": null,
       "index": "ao",
       "roundness": null,
-      "seed": 1963291895,
+      "seed": 72906657,
       "version": 3,
-      "versionNonce": 1282869145,
+      "versionNonce": 459022927,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480979,
+      "updated": 1792646773179,
       "link": null,
       "locked": false,
       "text": "watcher 每 2 s 拉一次日志\n过滤：发现时 ≤ 60 s（链上时间）\n· 关键词 · 不是自己发的\n· 价格 ≤ 2× 发射价 · 持仓 < 10\n预算：剩余额度和余额都 ≥ 3 mUSD",
@@ -1932,13 +1932,13 @@
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "r-176",
+      "containerId": "r-22",
       "originalText": "watcher 每 2 s 拉一次日志\n过滤：发现时 ≤ 60 s（链上时间）\n· 关键词 · 不是自己发的\n· 价格 ≤ 2× 发射价 · 持仓 < 10\n预算：剩余额度和余额都 ≥ 3 mUSD",
       "autoResize": true,
       "lineHeight": 1.15
     },
     {
-      "id": "lT7ffJBlBZhmp-EsyEqX6",
+      "id": "pYfyl9985jT9r6QF5Zqre",
       "type": "text",
       "x": 786.83984375,
       "y": 626.4,
@@ -1956,12 +1956,12 @@
       "frameId": null,
       "index": "ap",
       "roundness": null,
-      "seed": 479837719,
+      "seed": 1217059713,
       "version": 3,
-      "versionNonce": 538024567,
+      "versionNonce": 1906912801,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480979,
+      "updated": 1792646773179,
       "link": null,
       "locked": false,
       "text": "先把 pending = {id} 存盘\nexecute(…, correlationId = id)\n确认后开仓，再存盘",
@@ -1969,13 +1969,13 @@
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "r-177",
+      "containerId": "r-23",
       "originalText": "先把 pending = {id} 存盘\nexecute(…, correlationId = id)\n确认后开仓，再存盘",
       "autoResize": true,
       "lineHeight": 1.15
     },
     {
-      "id": "_rk7wUC-ngz4lp8hJTNgW",
+      "id": "iRIzHyq5zjmARnxsDFouz",
       "type": "text",
       "x": 1117.09375,
       "y": 635.6,
@@ -1993,12 +1993,12 @@
       "frameId": null,
       "index": "aq",
       "roundness": null,
-      "seed": 419947319,
+      "seed": 1149616993,
       "version": 3,
-      "versionNonce": 1464118393,
+      "versionNonce": 996212847,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480979,
+      "updated": 1792646773179,
       "link": null,
       "locked": false,
       "text": "approve + buy\n同一条 sponsor 路径",
@@ -2006,13 +2006,13 @@
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "r-179",
+      "containerId": "r-25",
       "originalText": "approve + buy\n同一条 sponsor 路径",
       "autoResize": true,
       "lineHeight": 1.15
     },
     {
-      "id": "FpE4w-EW_wuyyakMrEwPh",
+      "id": "nXsauWzcvetmUyF39ZOMV",
       "type": "text",
       "x": 237.63671875,
       "y": 821.6,
@@ -2030,12 +2030,12 @@
       "frameId": null,
       "index": "ar",
       "roundness": null,
-      "seed": 1790207063,
+      "seed": 1956163393,
       "version": 3,
-      "versionNonce": 772092823,
+      "versionNonce": 1736491521,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480979,
+      "updated": 1792646773179,
       "link": null,
       "locked": false,
       "text": "market-sim pump\n<SYMBOL> --wallet 2",
@@ -2043,13 +2043,13 @@
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "r-184",
+      "containerId": "r-30",
       "originalText": "market-sim pump\n<SYMBOL> --wallet 2",
       "autoResize": true,
       "lineHeight": 1.15
     },
     {
-      "id": "kU7nBPmYKQ9D7bEYJyAe2",
+      "id": "GmvbhpEDtdHtnHwdhIbZO",
       "type": "text",
       "x": 1118,
       "y": 821.6,
@@ -2067,12 +2067,12 @@
       "frameId": null,
       "index": "as",
       "roundness": null,
-      "seed": 292798839,
+      "seed": 522395425,
       "version": 3,
-      "versionNonce": 113947993,
+      "versionNonce": 1600461455,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480979,
+      "updated": 1792646773179,
       "link": null,
       "locked": false,
       "text": "大额买入，价格上涨\n→ Trade 事件",
@@ -2080,13 +2080,13 @@
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "r-187",
+      "containerId": "r-33",
       "originalText": "大额买入，价格上涨\n→ Trade 事件",
       "autoResize": true,
       "lineHeight": 1.15
     },
     {
-      "id": "3bbutyDKi7nyfUTj1Z6Ub",
+      "id": "jq5u5PARogfxApKha4HRd",
       "type": "text",
       "x": 745.75,
       "y": 923.4,
@@ -2104,12 +2104,12 @@
       "frameId": null,
       "index": "at",
       "roundness": null,
-      "seed": 512391831,
+      "seed": 311726849,
       "version": 3,
-      "versionNonce": 677947575,
+      "versionNonce": 150657505,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1792643480979,
+      "updated": 1792646773179,
       "link": null,
       "locked": false,
       "text": "持仓代币的 Trade 事件触发评估\n卖 50% 的净卖出值 ≥ 成本 × 1.5？\n→ quoteSell 复核 → 卖出（只止盈一次）",
@@ -2117,7 +2117,7 @@
       "fontFamily": 2,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "r-188",
+      "containerId": "r-34",
       "originalText": "持仓代币的 Trade 事件触发评估\n卖 50% 的净卖出值 ≥ 成本 × 1.5？\n→ quoteSell 复核 → 卖出（只止盈一次）",
       "autoResize": true,
       "lineHeight": 1.15

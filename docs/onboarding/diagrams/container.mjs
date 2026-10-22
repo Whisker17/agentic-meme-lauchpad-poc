@@ -13,7 +13,7 @@ export const alt =
 const proc = (x, y, w, h, title, sub, o = {}) => [
   rect(x, y, w, h, { stroke: o.stroke || C.muted, sw: o.sw, dashed: o.dashed }),
   text(x + 14, y + 10, title, { size: 18, color: o.color || C.text }),
-  ...(sub ? [text(x + 14, y + 36, sub, { size: 15, color: C.muted, lh: 1.4 })] : []),
+  ...(sub ? [text(x + 14, y + 36, sub, { size: 16, color: C.muted, lh: 1.4 })] : []),
 ];
 const host = (y, h, title, sub, o = {}) => proc(850, y, 400, h, title, sub, o);
 
@@ -25,7 +25,7 @@ export const skeleton = [
   tag(
     36,
     54,
-    "容器 mantle-meme-openclaw · OpenClaw 2026.10.5 镜像 + 内置 mantle-meme · 沙箱关闭，容器就是边界",
+    "容器 mantle-meme-openclaw · OpenClaw 2026.10.5 + 内置 mantle-meme · 沙箱关闭，容器隔离凭据",
     C.struct,
     16,
   ),
@@ -107,7 +107,7 @@ export const skeleton = [
     ],
     { stroke: C.struct },
   ),
-  tag(616, 516, "autopilot start → socket", C.struct, 15),
+  tag(616, 516, "autopilot start → socket", C.struct, 16),
   arrow(
     [
       [60, 230],
@@ -121,7 +121,7 @@ export const skeleton = [
     60,
     556,
     420,
-    80,
+    84,
     "autopilot daemon",
     "launcher 的后代，不在 OpenClaw 的进程树里：\n活过这一轮对话，直到 stop、撤销或容器停止",
     {
@@ -129,27 +129,27 @@ export const skeleton = [
       sw: 3,
     },
   ),
-  ...proc(500, 556, 300, 80, "直接从 exec 启动的 daemon", "实测：启动后几毫秒就被停掉", {
+  ...proc(500, 556, 300, 84, "直接从 exec 启动的 daemon", "实测：启动后几毫秒就被停掉", {
     stroke: C.danger,
     dashed: true,
     color: C.muted,
   }),
 
   tag(40, 660, "挂载（只有这三个）", C.muted, 16),
-  text(40, 686, "/home/node/.openclaw", { size: 15, color: C.text }),
-  text(290, 686, "← ~/.mantle-meme-openclaw", { size: 15, color: C.text }),
-  text(500, 686, "读写：OpenClaw 状态、模型登录、会话", { size: 15, color: C.muted }),
-  text(40, 712, "/home/node/.mantle-meme-agent", { size: 15, color: C.text }),
-  text(290, 712, "← ~/.mantle-meme-agent", { size: 15, color: C.text }),
-  text(500, 712, "读写：session key、journal、autopilot 文件", { size: 15, color: C.muted }),
-  text(40, 738, "/skills", { size: 15, color: C.text }),
-  text(290, 738, "← 仓库的 skills/", { size: 15, color: C.text }),
-  text(500, 738, "只读：SKILL.md", { size: 15, color: C.muted }),
+  text(40, 686, "/home/node/.openclaw", { size: 16, color: C.text }),
+  text(292, 686, "← ~/.mantle-meme-openclaw", { size: 16, color: C.text }),
+  text(512, 686, "读写：OpenClaw 状态、模型登录、会话", { size: 16, color: C.muted }),
+  text(40, 712, "/home/node/.mantle-meme-agent", { size: 16, color: C.text }),
+  text(292, 712, "← ~/.mantle-meme-agent", { size: 16, color: C.text }),
+  text(512, 712, "读写：session key、journal、autopilot", { size: 16, color: C.muted }),
+  text(40, 738, "/skills", { size: 16, color: C.text }),
+  text(292, 738, "← 仓库的 skills/", { size: 16, color: C.text }),
+  text(512, 738, "只读：SKILL.md", { size: 16, color: C.muted }),
   text(
     40,
-    780,
-    "环境变量：MANTLE_AA_HOME = agent home · MANTLE_AA_KEYSTORE_PASSWORD = agent 的密码（docker inspect 可见）\n· RPC / sponsor URL 指向 host.docker.internal · Telegram bot token 和 chat id · HTTPS_PROXY（可选）",
-    { size: 15, color: C.muted, lh: 1.6 },
+    770,
+    "环境变量：MANTLE_AA_HOME = agent home\nMANTLE_AA_KEYSTORE_PASSWORD = agent 的密码（docker inspect 可见）\nRPC / sponsor URL 指向 host.docker.internal · Telegram bot token 和 chat id · HTTPS_PROXY（可选）",
+    { size: 16, color: C.muted, lh: 1.5 },
   ),
 
   ...host(
@@ -196,7 +196,7 @@ export const skeleton = [
     ],
     { stroke: C.muted },
   ),
-  tag(850, 590, "容器经 host.docker.internal 访问这些服务", C.muted, 15),
+  tag(850, 590, "容器经 host.docker.internal 访问这些服务", C.muted, 16),
   text(850, 650, "从不挂载：\n~/.mantle-aa、root home、~/.ssh、\n~/.openclaw、docker socket", {
     size: 17,
     color: C.text,
