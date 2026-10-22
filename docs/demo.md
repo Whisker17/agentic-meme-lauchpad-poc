@@ -35,31 +35,59 @@ key files named below.
    `~/.mantle-meme-openclaw`: [skills/mantle-meme/README.md](../skills/mantle-meme/README.md)
    "Install (Docker)", steps 1 and 2. `demo-up.sh` rebuilds the image when the checkout changed and
    refuses to start without a usable login.
-4. **A Telegram bot.** In Telegram, open **@BotFather**, send `/newbot`, follow the prompts and
-   keep the token. Then open your new bot and press **Start** (a bot can only write to you after
-   that). Put the token in the demo's Telegram file, readable only by you:
+4. **A Telegram bot.** Only the demo on Mantle Sepolia needs one; a fork rehearsal can skip this.
+   The bot token and your chat id go into `~/.mantle-aa/keys/meme-demo-telegram.env` (mode 600),
+   and neither appears on screen or in your shell history.
+
+   In Telegram, open **@BotFather**, send `/newbot` and follow the prompts; it ends with the token.
+   Write it to a new file only you can read. `read -s` does not echo it and keeps it out of shell
+   history. `set -C` makes the command fail if the file already exists, instead of rewriting an old
+   file whose mode may be wrong; the mode is checked afterwards:
 
    ```bash
    mkdir -p ~/.mantle-aa/keys
-   printf 'MANTLE_MEME_TG_BOT_TOKEN=%s\n' '<the token>' > ~/.mantle-aa/keys/meme-demo-telegram.env
-   chmod 600 ~/.mantle-aa/keys/meme-demo-telegram.env
+   F=~/.mantle-aa/keys/meme-demo-telegram.env
+   ( umask 077; set -C; printf 'Bot token: '; IFS= read -rs T; echo
+     printf 'MANTLE_MEME_TG_BOT_TOKEN=%s\n' "$T" > "$F" ) &&
+     [ "$(stat -f '%Lp' "$F")" = 600 ] && echo "token saved, mode 600" ||
+     echo "NOT SAVED: $F already exists or is not mode 600"
    ```
 
-   Your numeric Telegram user id: send the bot any message, then (nothing else may be polling the
-   bot at that moment, so before `demo-up.sh`):
+   At `Bot token: `, paste the token (it is not shown) and press Enter; it prints
+   `token saved, mode 600`. `NOT SAVED` after `file exists` or `cannot overwrite existing file`:
+   the file exists from before. Once you no longer need its contents, `rm "$F"` and run this block
+   again (and the chat id block below too).
+
+   Open your new bot, press **Start** (a bot can only write to you after that) and send it any
+   message, such as `hi`, so the next block finds your id.
+
+   Then append your chat id to the same file: in a DM with the bot, your chat id is your user id.
+   Nothing else may be polling the bot at that moment, so do it before `demo-up.sh` (two pollers
+   both get `409 Conflict`). The block prints neither the token nor the id, only the outcome and
+   the number of variables in the file. The URL with the token goes from the shell's builtin
+   `printf` to `curl -K -` on its standard input, so it is in no process's arguments (`ps` cannot
+   show it). It takes only a numeric id from a private chat, and only if there is exactly one. If
+   the file already holds a chat id, it changes nothing and prints `chat id already saved`:
 
    ```bash
-   (. ~/.mantle-aa/keys/meme-demo-telegram.env
-    curl -s "https://api.telegram.org/bot$MANTLE_MEME_TG_BOT_TOKEN/getUpdates") |
-     jq '[.result[].message.from.id] | unique'
+   ( . "$F"
+     if grep -q '^MANTLE_MEME_TG_CHAT_ID=' "$F"; then echo "chat id already saved"; exit; fi
+     uid=$(printf 'url = "https://api.telegram.org/bot%s/getUpdates"\n' "$MANTLE_MEME_TG_BOT_TOKEN" |
+       curl -sS -K - | jq -r '[.result[]?.message? | select(.chat.type? == "private")
+         | .chat.id | select(type == "number")] | unique | if length == 1 then .[0] else empty end')
+     case $uid in
+       ''|*[!0-9]*) echo "no single sender found" ;;
+       *) printf 'MANTLE_MEME_TG_CHAT_ID=%s\n' "$uid" >> "$F" && echo "chat id saved" ;;
+     esac )
+   grep -c '^MANTLE_MEME_TG_' "$F"
    ```
 
-   Add it to the file as the chat id: in a DM with the bot, your chat id is your user id. OpenClaw
-   accepts messages from this id only, and the autopilot pushes to it.
-
-   ```bash
-   echo 'MANTLE_MEME_TG_CHAT_ID=<your user id>' >> ~/.mantle-aa/keys/meme-demo-telegram.env
-   ```
+   It prints `chat id saved` and `2`; run again, `chat id already saved` and `2`. To change the
+   chat id on purpose, delete its line first (`sed -i '' '/^MANTLE_MEME_TG_CHAT_ID=/d' "$F"`) and
+   run the block again. `no single sender found`: the bot has no DM yet (send one), or more than
+   one person wrote to it. `curl` hangs: your network reaches Telegram only through a proxy; set
+   `https_proxy` first, and later run `demo-up.sh` from the same shell (the container uses it).
+   OpenClaw accepts messages from this id only, and the autopilot pushes to it.
 
 5. **Key files** (testnet keys, never printed by the scripts):
    - the sponsor's **relayer key**: a file holding one `0x…` private key, bare or as `KEY=0x…`. The
@@ -71,6 +99,7 @@ key files named below.
    - two **passwords**, one for the root home and one for the agent home (DESIGN §8.1):
 
      ```bash
+     mkdir -p ~/.mantle-aa/keys
      (umask 077; openssl rand -hex 16 > ~/.mantle-aa/keys/meme-demo-root.password
                  openssl rand -hex 16 > ~/.mantle-aa/keys/meme-demo-agent.password)
      ```
@@ -196,16 +225,61 @@ It stops the autopilot (`autopilot stop`), removes the container, then stops mar
 sponsor and the relay (and the fork and the mock after a rehearsal). Running it again does nothing. Your homes,
 `~/.mantle-meme-openclaw` and the logs in `~/.mantle-meme-demo` stay.
 
-To run the demo again (a revoked or expired grant), after `demo-down.sh`: grant again, and export
-into an empty agent home (`session export` refuses one the agent has used), then start again.
+To run the demo again (a revoked or expired grant): after `demo-down.sh`, in the root terminal
+set up as in [The root terminal](#the-root-terminal), run these blocks in order. Run a block only
+once the previous one printed what it should; after a failure, do not empty the agent home.
+
+The account:
+
+```bash
+export DEMO_ACCOUNT=$(mantle-aa keys list | jq -r '.profiles[] | select(.name == "owner") | .account')
+echo "$DEMO_ACCOUNT"
+```
+
+It prints your account address. An empty line: `MANTLE_AA_HOME` is not the root home of step 1.
+
+The relay and the sponsor (`demo-down.sh` stopped them, and the grant goes through them):
+
+```bash
+scripts/demo-up.sh sponsor
+```
+
+As in step 1, the last line is `demo-up: ready for the human's setup: …`.
+`DEMO_RELAYER_KEY_FILE must name a readable file`: the root terminal's variables are not set.
+
+A new session key for `trader`:
 
 ```bash
 mantle-aa session grant --agent trader --policy "$MANTLE_AA_HOME/policy.json"
-rm -rf "$MANTLE_MEME_AGENT_HOME"      # the old session key and its journal only
-MANTLE_AA_EXPORT_PASSWORD=$(cat "$DEMO_AGENT_PASSWORD_FILE") \
-  mantle-aa session export --agent trader --out "$MANTLE_MEME_AGENT_HOME"
-scripts/demo-up.sh sponsor && scripts/demo-up.sh      # with DEMO_ACCOUNT set
 ```
+
+It prints JSON with a new `expiry`, a `hash` and `"previousProfile": "trader.v1"` (the number
+grows with every re-run). `error: HTTP request failed.`: the relay may not be up.
+`Sponsor unreachable: ECONNREFUSED`: the sponsor may not be up. See the previous block's output,
+`~/.mantle-meme-demo/rpc-relay.log` and `~/.mantle-meme-demo/sponsor.log`.
+
+Empty the agent home and export into it (`session export` refuses a home the agent has used).
+`rm -rf` removes the agent home only: the old session key and its journal.
+
+```bash
+rm -rf "$MANTLE_MEME_AGENT_HOME" &&
+  MANTLE_AA_EXPORT_PASSWORD=$(cat "$DEMO_AGENT_PASSWORD_FILE") \
+  mantle-aa session export --agent trader --out "$MANTLE_MEME_AGENT_HOME"
+```
+
+It prints JSON with `"role": "agent"` and the `keyHash` of the grant. A password file error:
+`DEMO_AGENT_PASSWORD_FILE` is not set; set it and run only this block again.
+
+Everything else:
+
+```bash
+scripts/demo-up.sh
+```
+
+The last line is the one of step 1; in Telegram, the remaining limit is back to 50 mUSD.
+`no exported agent home`: the previous block failed; go back to it.
+
+The account needs no new `account init`: the root key and the policy stay in the root home.
 
 ## Before recording
 
