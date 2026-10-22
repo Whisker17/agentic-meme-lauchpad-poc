@@ -2,6 +2,7 @@
 
 这是我按 [demo.md](demo.md) 在 Mantle Sepolia 上完整跑一遍演示的记录，每一步都配了截图。
 你可以对照着它，看看每一步实际长什么样。
+要自己复现，照着[复现手册](runbook.md)做，它从 clone 讲到跑完整个演示。
 
 > TODO（发布前删掉这段）：这是一份模板。标了 **TODO** 的地方，跑完之后手动填上。截图槽位里的
 > 图片代码都是注释掉的，把图放进 `docs/example/screenshots/` 之后，删掉那一行的注释就能显示。
@@ -85,7 +86,7 @@ flowchart LR
    scripts/demo-up.sh sponsor
    ```
 
-3. 策略、授权、agent home 和 MockUSD：
+3. 初始化策略、授权 session key、导出 agent home，再领取测试用的 MockUSD：
 
    ```bash
    mantle-meme policy init --total 100 --per-day 50 --expiry 24h --out "$MANTLE_AA_HOME/policy.json"
@@ -109,7 +110,7 @@ flowchart LR
 - `keys new` 打印出账户地址。
 - `policy init` 打印出最后那条命令，里面是给你账户的 mint，复制它的 `--calls '…'`。授权有效期 24 小时。
 - `demo-up.sh` 最后一行是 `demo-up: up: … Telegram bot (@<your bot>)`。
-- bot 回复了你的第一条消息；`/new` 之后对话是空的。
+- bot 回复了你的第一条消息；发送 `/new` 后，开始一段新的 agent 会话。
 
 ### 截图
 
