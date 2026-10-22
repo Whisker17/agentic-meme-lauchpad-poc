@@ -1060,8 +1060,9 @@ mantle-aa session grant --agent trader --policy "$MANTLE_AA_HOME/policy.json"
 看到这个就对了：输出带新的 `expiry`、`hash` 和 `"previousProfile": "trader.v1"` 的 JSON（每重跑一次，
 后面的数字加 1）。
 
-不对？先查这个：卡住然后报 `Sponsor did not answer`，说明 sponsor 没起来，看上一块的输出和
-`~/.mantle-meme-demo/sponsor.log`。
+不对？先查这个：报 `error: HTTP request failed.`，可能是中继没起来；报
+`Sponsor unreachable: ECONNREFUSED`，可能是 sponsor 没起来。看上一块的输出，以及
+`~/.mantle-meme-demo/rpc-relay.log` 和 `~/.mantle-meme-demo/sponsor.log`。
 
 清空 agent home 并重新导出。`rm -rf` 只删 agent home：旧的 session key 和它的交易记录：
 

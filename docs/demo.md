@@ -99,6 +99,7 @@ key files named below.
    - two **passwords**, one for the root home and one for the agent home (DESIGN §8.1):
 
      ```bash
+     mkdir -p ~/.mantle-aa/keys
      (umask 077; openssl rand -hex 16 > ~/.mantle-aa/keys/meme-demo-root.password
                  openssl rand -hex 16 > ~/.mantle-aa/keys/meme-demo-agent.password)
      ```
@@ -253,8 +254,9 @@ mantle-aa session grant --agent trader --policy "$MANTLE_AA_HOME/policy.json"
 ```
 
 It prints JSON with a new `expiry`, a `hash` and `"previousProfile": "trader.v1"` (the number
-grows with every re-run). It hangs, then `Sponsor did not answer`: the sponsor is not up; see the
-previous block and `~/.mantle-meme-demo/sponsor.log`.
+grows with every re-run). `error: HTTP request failed.`: the relay may not be up.
+`Sponsor unreachable: ECONNREFUSED`: the sponsor may not be up. See the previous block's output,
+`~/.mantle-meme-demo/rpc-relay.log` and `~/.mantle-meme-demo/sponsor.log`.
 
 Empty the agent home and export into it (`session export` refuses a home the agent has used).
 `rm -rf` removes the agent home only: the old session key and its journal.

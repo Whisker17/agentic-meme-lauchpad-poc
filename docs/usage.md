@@ -52,11 +52,11 @@ mantle-aa account exec --calls '<the MockUSD mint that policy init printed>'
 
 - The RPC: the public `https://rpc.sepolia.mantle.xyz` serves single CLI commands. For the demo on
   Mantle Sepolia, set `MANTLE_AA_RPC_URL=http://127.0.0.1:8547` instead, the local relay that
-  `scripts/demo-up.sh sponsor` starts, and run that right after `keys new` (it needs the account),
-  before `policy init` and every command after it: the public RPC refuses bursts of calls
-  ("rate limit exceeded"), and the relay sends at most 4 at a time and retries the refused ones.
-  The fork rehearsal uses the fork, `http://127.0.0.1:8545`. Both: [demo.md](demo.md)
-  "The root terminal".
+  `scripts/demo-up.sh sponsor` starts: the public RPC refuses bursts of calls ("rate limit
+  exceeded"), and the relay sends at most 4 at a time and retries the refused ones. The fork
+  rehearsal uses the fork, `http://127.0.0.1:8545`. For the demo, follow
+  [The root terminal](demo.md#the-root-terminal). After `keys new`, start the relay with
+  `scripts/demo-up.sh sponsor` before running `policy init` or subsequent setup commands.
 - `policy init` writes the policy (a MockUSD limit, the launchpad as the only spender) and prints
   the next three commands with the exact mint calldata for your account.
 - The grant expires 24 hours after `account init --grant` (`--expiry 24h` is the only value).
