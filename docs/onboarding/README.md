@@ -6,8 +6,9 @@ three parts:
 
 1. **Principles** (sections 1–3): the 7702 SDK (design, how it works, how to use it), the
    components the launchpad adds on top of it, and how the two run as one system.
-2. **A real run** (section 4): the nine demo steps as run on Mantle Sepolia on 2026-10-22. Each step
-   shows what it does, the code behind it, and its real input and output.
+2. **A real run** (section 4): the nine demo steps as run on Mantle Sepolia on 2026-10-22, after a
+   step 0 on funding (who needs MNT and why). Each step shows what it does, the code behind it, and
+   its real input and output.
 3. **Reference** (sections 5–8): security model, technology choices, known limits, code map.
 
 Open it locally: clone the repository and open `docs/onboarding/index.html` in a browser. It is an
@@ -50,8 +51,10 @@ out in captions and cross-references; renumber them by hand when you add or move
 step. The JSON in section 4 comes from that run's records: the agent's `exec` calls and their
 output in the OpenClaw session log, the agent home's `meme/journal.jsonl` and
 `meme/autopilot/events.jsonl`, and terminal output copied during recording. It is reformatted for
-reading, not edited. A new run means new screenshots and new JSON; keep the step layout (what it
-does, the code behind it, input, output).
+reading, not edited. The gas figures (step 0 and the ledger) are computed from the transactions'
+receipts and match the relayer's balance change over the run. Step 0 itself was not recorded: it
+follows `docs/runbook.md` section 5. A new run means new screenshots and new JSON; keep the step
+layout (what it does, the code behind it, input, output).
 
 ## Regenerating
 

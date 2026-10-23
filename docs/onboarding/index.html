@@ -187,6 +187,7 @@ code{font-family:var(--mono);font-size:.86em;background:var(--code);border:1px s
 .legend .w~.w{margin-left:1em}
 .step{max-width:var(--wide);margin:1.8em 0;padding:18px 22px 8px;background:var(--bg2);border:1px solid var(--line);border-radius:12px;scroll-margin-top:72px}
 @media (min-width:1440px){.step{scroll-margin-top:24px}}
+.step.prep{border-style:dashed;background:none}
 .step-h{display:flex;gap:14px;align-items:flex-start;padding-bottom:12px}
 .step-h .sn{width:2.3em;height:2.3em;border-width:2px;font-size:1rem}
 .step h3{margin:0}
@@ -431,15 +432,15 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--line);font-si
   <li><b>原地升级</b><span>人的普通钱包（EOA）通过 EIP-7702 升级成 Calibur 智能账户。地址、余额、私钥都不变。</span></li>
   <li><b>session key</b><span>人给每个 agent 授一把自己的密钥，不是 admin，24 小时过期，随时可撤销。</span></li>
   <li><b>链上 policy</b><span>这把 key 能调哪些函数、能花多少钱，由链上的 <code>AgentPolicyHook</code> 在执行时检查，不靠链下代码自觉。</span></li>
-  <li><b>gasless</b><span>升级、授权、执行、撤销，每一步都由 sponsor 付 gas。人和 agent 都可以一个 MNT 都没有。</span></li>
+  <li><b>gasless</b><span>升级、授权、执行、撤销，每一步都由 sponsor 付 gas。人和 agent 都可以一个 MNT 都没有，MNT 由运营方充给 relayer（<a href="#run-0">步骤 0</a>）。</span></li>
 </ol>
 
 <p class="sub-k" id="sdk-design">设计</p>
-<h3 id="sdk-parts">三个包，两个合约<a class="anchor" href="#sdk-parts" aria-label="复制本节链接">#</a></h3>
-<p>SDK 分链下和链上两半。链下三个包各有各的用户：人用 CLI，程序（比如本项目的 meme-sdk）用 TypeScript 库，运营方跑 sponsor。链上只有一个合约是 SDK 自己写的，就是 <code>AgentPolicyHook</code>；账户本身用的是 Uniswap 现成的 Calibur。</p>
+<h3 id="sdk-parts">三个包，三个合约<a class="anchor" href="#sdk-parts" aria-label="复制本节链接">#</a></h3>
+<p>SDK 分链下和链上两半。链下三个包各有各的用户：人用 CLI，程序（比如本项目的 meme-sdk）用 TypeScript 库，运营方跑 sponsor。链上三个合约里，账户本身用的是 Uniswap 现成的 Calibur；SDK 自己写了 <code>AgentPolicyHook</code>，又移植了一个给 4337 路径用的 <code>VerifyingPaymaster</code>。下面两小节分别讲为什么这样分包、每个合约做什么。</p>
 
 <figure class="fig" id="fig-sdk-arch">
-  <div class="arch" role="img" aria-label="7702 SDK 的组成。链下三个 npm 包：mantle-aa-cli 是人在 root 终端用的 mantle-aa 命令；mantle-aa-sdk 是 TypeScript 库，核心是给 root 用的 MantleAccount、给 agent 用的 AgentSession、负责提交的 Executor，以及加密的 keystore；mantle-aa-sponsor 是代付服务，鉴权、模拟、记账，由 relayer 热钱包付 gas。链上：人的 EOA 通过 7702 委托给 CaliburEntry v1.1.0；每把 session key 绑定 AgentPolicyHook；4337 路径的 VerifyingPaymaster 和 EntryPoint v0.8 本项目不用。">
+  <div class="arch" role="img" aria-label="7702 SDK 的组成。链下三个 npm 包：mantle-aa-cli 是人在 root 终端用的 mantle-aa 命令；mantle-aa-sdk 是 TypeScript 库，核心是给 root 用的 MantleAccount、给 agent 用的 AgentSession、负责提交的 Executor，以及加密的 keystore；mantle-aa-sponsor 是代付服务，鉴权、模拟、记账，由 relayer 热钱包付 gas。链上：人的 EOA 通过 7702 委托给 CaliburEntry v1.1.0；每把 session key 绑定 AgentPolicyHook；4337 路径的 VerifyingPaymaster（SDK 移植）和 EntryPoint v0.8 本项目不用。">
     <div class="lane">
       <p class="lane-h">链下 · npm 包</p>
       <div class="boxes">
@@ -455,13 +456,62 @@ footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--line);font-si
       <div class="boxes">
         <div class="box"><p class="bt">人的 EOA → CaliburEntry v1.1.0</p><p class="bd">Uniswap 的 7702 账户实现。多把 key，每把 key 有过期时间、可以绑一个 hook。</p><p class="ad"><code>0x0000…7030e</code></p></div>
         <div class="box hi"><p class="bt">AgentPolicyHook</p><p class="bd">SDK 自己写的合约。session key 批次里的每个调用，执行前后各检查一次：白名单、额度、inventory、deadline、撤销。</p><p class="ad"><code>0xdC99…dD7F</code></p></div>
-        <div class="box dim"><p class="bt">VerifyingPaymaster + EntryPoint v0.8</p><p class="bd">ERC-4337 路径。SDK 实现了，本项目不走。</p></div>
+        <div class="box dim"><p class="bt">VerifyingPaymaster（+ EntryPoint v0.8）</p><p class="bd">ERC-4337 路径的代付合约。SDK 移植的，本项目不走这条路径。</p><p class="ad"><code>0x3018…3B4C</code></p></div>
       </div>
     </div>
   </div>
   <figcaption><span class="ct"><b>图 2</b>回答：7702 SDK 由哪些包和合约组成，谁用哪一个。绿框是这一节的重点。</span></figcaption>
 </figure>
 
+<h3 id="sdk-pkgs">为什么分成三个包<a class="anchor" href="#sdk-pkgs" aria-label="复制本节链接">#</a></h3>
+<p>三个包按“谁用、在哪运行、握着什么”切开。它们的依赖是单向的：<code>cli → sponsor → sdk</code>，<code>cli → sdk</code>；最底下的 <code>sdk</code> 不依赖另外两个，除了 viem 什么都不带。</p>
+<div class="tbl">
+<table>
+  <thead><tr><th scope="col">包</th><th scope="col">给谁</th><th scope="col">里面有什么</th><th scope="col">依赖</th><th scope="col">为什么单独成包</th></tr></thead>
+  <tbody>
+    <tr><td><code>mantle-aa-sdk</code></td><td>写程序的人：本项目的 meme-sdk，以及另外两个包自己</td><td><code>MantleAccount</code>、<code>AgentSession</code>、两个 Executor、keystore 和 profiles、Mantle Sepolia 地址簿、合约 ABI、类型化错误</td><td>只有 <code>viem</code>，而且是 peer dependency</td><td>它要被嵌进 agent 这种不可信的进程里，所以不带服务、数据库和热钱包。viem 用 peer 依赖，调用方和 SDK 共用一份；装两份的话，TypeScript 会把两份 viem 的类型当成不同类型拒绝</td></tr>
+    <tr><td><code>mantle-aa-sponsor</code></td><td>运营方，也就是掏 MNT 付 gas 的人</td><td>HTTP JSON-RPC 服务（<code>sponsor_relay</code>，以及 4337 用的 ERC-7677 <code>pm_*</code>）、请求鉴权、allowlist 和预算、SQLite 账本、relayer 和 paymaster 的签名</td><td><code>sdk</code>、<code>yaml</code></td><td>它握着 relayer 热钱包和运营方的预算，是一个长期运行的服务，信任对象和生命周期都和 agent 不同。单独成包也能在别的进程里直接启动（<code>startEmbeddedSponsor</code>）：本仓库的 fork 测试就这样用</td></tr>
+    <tr><td><code>mantle-aa-cli</code></td><td>人（root 终端）和运维</td><td><code>mantle-aa</code> 命令、环境变量约定、<code>--json</code> 输出和退出码</td><td><code>sdk</code>、<code>sponsor</code></td><td>一层薄壳：把库和服务包成命令，<code>mantle-aa sponsor serve</code> 跑的就是 sponsor 包。机器可读的 <code>--json</code> 和退出码是 SDK 设计时就定下的接口</td></tr>
+  </tbody>
+</table>
+</div>
+<p>本项目三个包都用到了，但用法不同：<code>mantle-meme</code> 的交易只依赖 <code>sdk</code>；它从 <code>cli</code> 只拿常量（<code>MANTLE_AA_HOME</code> 等变量名）、<code>UsageError</code>、<code>EXIT_CODES</code> 和 <code>describeError</code>，所以它的退出码和错误 JSON 跟 <code>mantle-aa</code> 一模一样；<code>sponsor</code> 只在 fork 测试里进程内启动，演示时由人用 <code>mantle-aa sponsor serve</code> 单独跑。<span class="m">（AA-DESIGN Q4、Q15；AA usage.md “Installing the packages”）</span></p>
+
+<h3 id="sdk-contracts">三个合约各做什么<a class="anchor" href="#sdk-contracts" aria-label="复制本节链接">#</a></h3>
+<p>分工是：Calibur 管“谁能签、签了就执行”，hook 管“这一笔允不允许”，paymaster 只在 4337 路径上管“谁付 gas”。三者都部署在 Mantle Sepolia 上，所有账户共用，不是每个账户各部署一份。</p>
+<div class="keys">
+  <article class="kc root">
+    <span class="who">Uniswap · 未修改</span>
+    <h4>CaliburEntry v1.1.0</h4>
+    <dl>
+      <dt>是什么</dt><dd>账户本身的代码：EOA 通过 7702 委托给它。SDK 在 Mantle Sepolia 上按官方地址复现部署，运行时代码哈希与官方一致。<br><code>0x000000005c84F8Fd50b21CAC312528A64437030e</code></dd>
+      <dt>做什么</dt><dd>key 注册表（<code>register</code>、<code>revoke</code>、<code>update</code>：是否 admin、过期时间、绑哪个 hook）；验签并执行批次（<code>execute(SignedBatchedCall)</code>：截止时间、指定 executor、每把 key 一个 nonce 通道）；按 hook 地址的低 5 位决定调用哪些回调；还有 4337 入口和 ERC-1271。</dd>
+      <dt>不做</dt><dd>不懂额度、白名单、inventory，这些全交给 hook。它自带的保护只有：非 admin 的 key 不能调用账户自己，也不能调 EntryPoint。</dd>
+    </dl>
+  </article>
+  <article class="kc sess">
+    <span class="who">SDK 自己写 · 单例、不可升级</span>
+    <h4>AgentPolicyHook</h4>
+    <dl>
+      <dt>是什么</dt><dd>session key 的链上 policy，所有账户共用一个。地址低 5 位是 <code>0x1f</code>，五个回调全开。<br><code>0xdC99279cc8858a109A0dE31b021D54EBe30aDd7F</code></dd>
+      <dt>存什么</dt><dd>按 <code>(keyHash, 账户)</code> 存：policy、状态（initialized / active / revoked）、每种报价资产已花的总额和当期额度、每个代币的 inventory。</dd>
+      <dt>做什么</dt><dd><code>beforeExecute</code> 查白名单和参数、快照余额；<code>afterExecute</code> 记额度、记 inventory；验签后和 4337 验证时查 key 是否有效；ERC-1271 签名一律拒绝。<code>setPolicy</code>、<code>updatePolicy</code>、<code>revoke</code>、<code>releaseInventory</code> 只有账户自己（root 批次）能调。</dd>
+      <dt>上限</dt><dd>每个账户最多 8 个活跃 session；每个 policy 最多 4 种报价资产、4 个受信 spender、16 条权限。这样 <code>panic</code> 一笔交易一定能做完。</dd>
+    </dl>
+  </article>
+  <article class="kc relay">
+    <span class="who">SDK 移植 · 本项目不用</span>
+    <h4>VerifyingPaymaster</h4>
+    <dl>
+      <dt>是什么</dt><dd>ERC-4337 路径的代付合约，从 eth-infinitism v0.7 的样例移植到 EntryPoint v0.8。<br><code>0x301813D34cBebdf90FEBf32929CfB323c9eF3B4C</code><br>EntryPoint v0.8：<code>0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108</code></dd>
+      <dt>做什么</dt><dd>sponsor 的签名 key 给每个 UserOp 签一个带有效期的 <code>paymasterAndData</code>；paymaster 验签通过后，用它存在 EntryPoint 里的 MNT 付 gas。它还要求 sender 的代码正好是“委托给 CaliburEntry”，防止签完再换委托、重用代付签名。hook 要求 session 的 UserOp 必须用它，否则验证失败。</dd>
+      <dt>和本项目</dt><dd>relayer 路径不经过它：gas 由 relayer 直接付（见<a href="#run-0">步骤 0</a>）。</dd>
+    </dl>
+  </article>
+</div>
+<p class="m">SDK 仓库里还有三个验收用的 mock：<code>MockUSD</code>、<code>MockLaunchpad</code>、<code>MemeToken</code>。本项目用了已部署的 MockUSD 作报价资产（谁都能铸）；发射台是自己写的 <code>MemeLaunchpad</code>，按 SDK 对受信发射台的接口约定实现（AA-DESIGN §4.4）。</p>
+
+<h3 id="sdk-trust">信任模型<a class="anchor" href="#sdk-trust" aria-label="复制本节链接">#</a></h3>
 <p>四方的信任程度完全不同，SDK 的每个设计都从这张表推出来：</p>
 <div class="tbl">
 <table>
@@ -1019,7 +1069,7 @@ export async function execute(o) {
 <div class="part" id="part-2">
   <p class="pk">第二部分</p>
   <p class="pt">实战</p>
-  <p class="pd">原理讲完，看一次真实的运行。下面是 2026-10-22 在 Mantle Sepolia 上按 <code>docs/demo.md</code> 跑完的九步，每一步都拆成同样的四块：做了什么、背后的代码、输入、输出。</p>
+  <p class="pd">原理讲完，看一次真实的运行。下面是 2026-10-22 在 Mantle Sepolia 上按 <code>docs/demo.md</code> 跑完的九步，前面补了一步录制之前的注资。每一步都拆成同样的四块：做了什么、背后的代码、输入、输出。</p>
 </div>
 
 <!-- ============================================================ 4 -->
@@ -1048,8 +1098,9 @@ export async function execute(o) {
 </table>
 </div>
 
-<nav class="stepnav" aria-label="九个步骤">
+<nav class="stepnav" aria-label="准备和九个步骤">
   <ol>
+    <li><a href="#run-0"><span class="sn">0</span><span class="st">注资（录制前）</span><span class="pl wait">准备</span></a></li>
     <li><a href="#run-1"><span class="sn">1</span><span class="st">建账户、启动</span><span class="pl you">root 终端</span></a></li>
     <li><a href="#run-2"><span class="sn">2</span><span class="st">查余额和额度</span><span class="pl tg">Telegram</span></a></li>
     <li><a href="#run-3"><span class="sn">3</span><span class="st">发币 + 首买</span><span class="pl tg">Telegram</span></a></li>
@@ -1063,6 +1114,67 @@ export async function execute(o) {
 </nav>
 
 <p class="legend">“背后的代码”里的标签：<span class="w you">人</span>你在 root 终端做的事 <span class="w llm">LLM</span>OpenClaw 里的模型 <span class="w cli">meme</span>本仓库的 CLI / meme-sdk / daemon <span class="w aa">AA SDK</span>npm 上的 SDK <span class="w sp">sponsor</span>代付服务 <span class="w ch">链上</span>合约</p>
+
+<!-- ---------- step 0 ---------- -->
+<article class="step prep" id="run-0" aria-labelledby="run-0-h">
+<header class="step-h"><span class="sn" aria-hidden="true">0</span><div><h3 id="run-0-h">注资：谁需要 MNT，从哪来<a class="anchor" href="#run-0" aria-label="复制本节链接">#</a></h3><p class="where"><span class="pl wait">录制之前</span><span>不在九步之内 · 这次录屏没有拍到，按 <code>docs/runbook.md</code> 第 5 节补上</span></p></div></header>
+<div class="row"><p class="rl">做了什么</p><div class="rc">
+<p>“gasless”是对账户和 agent 说的，gas 并没有消失，而是由别人付。整个演示里只有<strong>自己发交易</strong>的地址需要 MNT：sponsor 的 relayer（替账户付全部 gas），以及 market-sim 的三个 EOA（它们不走 sponsor）。账户和 session key 从头到尾都是 0 MNT。MockUSD 不用转：它谁都能铸，账户在步骤 1 自己铸，market-sim 不够时也自己铸。</p>
+<div class="tbl">
+<table>
+  <thead><tr><th scope="col">地址</th><th scope="col">为什么要 MNT</th><th scope="col">需要多少</th><th scope="col">这次运行</th></tr></thead>
+  <tbody>
+    <tr><td>relayer <code>0x03BA…cF8F</code></td><td>账户的每一笔交易都由它发出、付 gas</td><td>≥ 1 MNT</td><td>开始前 2.0719，10 笔共花 <strong>0.2110</strong>，剩 1.8610</td></tr>
+    <tr><td>market-sim EOA 0、1</td><td><code>market-sim run</code> 发币、随机交易，自付 gas，每分钟约 1.3 笔</td><td>各 ≥ 0.5 MNT（约 20 分钟）</td><td>未统计</td></tr>
+    <tr><td>market-sim EOA 2 <code>0x1a04…81Bd</code></td><td>步骤 6 的拉盘</td><td>≥ 0.1 MNT</td><td>拉盘那笔 0.0062</td></tr>
+    <tr><td>账户、session key</td><td>不需要：gas 由 relayer 付</td><td>0</td><td>0（现在仍是 0）</td></tr>
+  </tbody>
+</table>
+</div>
+</div></div>
+<div class="row"><p class="rl">输入</p><div class="rc">
+<div class="code"><p class="cap">root 终端，在仓库根目录（docs/runbook.md 第 5 节，节选）</p><button class="btn copy" type="button">复制</button><pre><code><span class="c"># 1. 生成 relayer 私钥和 market-sim 助记词：直接写进文件、权限 600，不显示</span>
+mkdir -p ~/.mantle-aa/keys &amp;&amp; cd ~/.mantle-aa/keys
+( umask 077; set -C
+  cast wallet new --json | jq -er '"DEMO_RELAYER_KEY=" + .[0].private_key' &gt; meme-demo-relayer.env
+  cast wallet new-mnemonic --json | jq -er .mnemonic &gt; meme-demo-marketsim.mnemonic )
+cd -
+
+<span class="c"># 2. 只打印要充值的地址</span>
+K=$(grep -oE '0x[0-9a-fA-F]{64}' ~/.mantle-aa/keys/meme-demo-relayer.env | head -1) node --input-type=module \
+  -e 'import { privateKeyToAddress as a } from "viem/accounts"; console.log(a(process.env.K))'
+MARKET_SIM_MNEMONIC_FILE=~/.mantle-aa/keys/meme-demo-marketsim.mnemonic node tools/market-sim/dist/bin.js addresses
+
+<span class="c"># 3. 用测试网水龙头或你自己的测试网钱包给这四个地址转 MNT，到账后检查</span>
+cast balance &lt;地址&gt; --ether --rpc-url https://rpc.sepolia.mantle.xyz</code></pre></div>
+<p class="m">已经有一个有钱的测试网私钥，也可以直接写进 <code>meme-demo-relayer.env</code>（裸写或写成 <code>KEY=0x…</code>）。fork 彩排用 anvil 的公开测试密钥，一个 MNT 都不花。</p>
+</div></div>
+<div class="row"><p class="rl">背后的代码</p><ol class="trace">
+  <li><span class="w cli">meme</span><code>demo-up.sh sponsor</code> 从 <code>DEMO_RELAYER_KEY_FILE</code> 读出私钥，只通过环境变量交给 sponsor 进程；<code>sponsor.yaml</code> 里只有对它的引用（步骤 1b）。</li>
+  <li><span class="w sp">sponsor</span>每个请求先按最坏情况预留费用：<code>gasLimit × (maxFeePerGas + operatorFeeScalar × 100) + operatorFeeConstant + L1 费上限</code>；上链后按回执里实际付的结算，失败的交易也算钱。relayer 余额不够时请求失败，CLI 报 exit 20，<code>sponsor.log</code> 里能看到原因。</li>
+  <li><span class="w sp">sponsor</span>演示配置里的 <code>dailyBudgetMnt: 2</code>、<code>maxFeePerRequestMnt: 0.3</code>、<code>managementReserveMnt: 0.5</code> 管的是 relayer 的钱<em>怎么花</em>：业务请求用不掉留给撤销和 panic 的那 0.5（<a href="#flow-buy">预算参数</a>）。它们不会给 relayer 充值。</li>
+  <li><span class="w you">人</span>root 只有一种情况需要 MNT：sponsor 不可用时用 <code>account panic --self-pay</code> 自己发撤销交易。</li>
+</ol></div>
+<div class="row"><p class="rl">输出</p><div class="rc">
+<p>这次运行 relayer 付的 gas，按区块逐笔从回执算出来（Mantle 的费用 = 执行费 + operator 费 + L1 费，这几笔的 L1 费都小于 10⁻⁹ MNT）。合计正好等于 relayer 在区块 45559077 和 45559805 的余额差，nonce 从 41 走到 51：</p>
+<div class="tbl">
+<table>
+  <thead><tr><th scope="col">步骤</th><th scope="col">交易</th><th scope="col">gasUsed</th><th scope="col">MNT</th></tr></thead>
+  <tbody>
+    <tr><td><a href="#run-1">1</a></td><td>7702 升级 + 授予 <code>trader</code></td><td>747,559</td><td>0.044854</td></tr>
+    <tr><td><a href="#run-1">1</a></td><td><code>MockUSD.mint</code></td><td>79,580</td><td>0.004775</td></tr>
+    <tr><td><a href="#run-3">3</a></td><td>发币 + 首买（3 个调用）</td><td>1,031,665</td><td>0.061900</td></tr>
+    <tr><td><a href="#run-5">5</a></td><td>autopilot 买入 × 4</td><td>约 307,720 / 笔</td><td>0.018463 / 笔</td></tr>
+    <tr><td><a href="#run-6">6</a></td><td>止盈卖出</td><td>187,962</td><td>0.011278</td></tr>
+    <tr><td><a href="#run-7">7</a></td><td>领手续费</td><td>134,848</td><td>0.008091</td></tr>
+    <tr><td><a href="#run-9">9</a></td><td>撤销</td><td>103,632</td><td>0.006218</td></tr>
+    <tr><td></td><td><strong>合计 10 笔</strong></td><td></td><td><strong>0.210969</strong></td></tr>
+  </tbody>
+</table>
+</div>
+<p class="m">对比一下：一次 session 买入批次（<code>approve</code> + <code>buy</code>）用约 30.8 万 gas，步骤 6 里 market-sim 的 EOA 直接买入一笔用 10.3 万。差额来自批次里的 <code>approve</code>、Calibur 验签，以及 hook 在每个调用前后的检查和记账。这是把权限放到链上的代价。</p>
+</div></div>
+</article>
 
 <!-- ---------- step 1 ---------- -->
 <article class="step" id="run-1" aria-labelledby="run-1-h">
@@ -1480,22 +1592,22 @@ mantle-aa account exec --calls "$CALLS"</code></pre></div></div></div>
 </article>
 
 <h3 id="run-ledger">这次运行的链上账本<a class="anchor" href="#run-ledger" aria-label="复制本节链接">#</a></h3>
-<p>账户相关的交易一共 10 笔：root 签 3 笔，session key 签 7 笔（其中 4 笔是 daemon 发的），gas 全部由 relayer 付。另有 1 笔是 market-sim 自己付 gas 的拉盘。时间是 UTC+8，按区块顺序排列。</p>
+<p>账户相关的交易一共 10 笔：root 签 3 笔，session key 签 7 笔（其中 4 笔是 daemon 发的），gas 全部由 relayer 付，合计 0.210969 MNT（<a href="#run-0">步骤 0</a>）。另有 1 笔是 market-sim 自己付 gas 的拉盘。时间是 UTC+8，按区块顺序排列。</p>
 <div class="tbl long">
 <table>
-  <thead><tr><th scope="col">时间</th><th scope="col">步骤</th><th scope="col">谁签</th><th scope="col">调用</th><th scope="col">mUSD</th><th scope="col">交易</th></tr></thead>
+  <thead><tr><th scope="col">时间</th><th scope="col">步骤</th><th scope="col">谁签</th><th scope="col">调用</th><th scope="col">mUSD</th><th scope="col">gas（MNT）</th><th scope="col">交易</th></tr></thead>
   <tbody>
-    <tr><td>17:53</td><td><a href="#run-1">1</a></td><td>root</td><td>7702 升级 + 授予 <code>trader</code>（type-4）</td><td></td><td><a href="https://sepolia.mantlescan.xyz/tx/0x43b68db44b607952acdd1c7ef759018b0cc994516336520be719d738c76d6bac"><code>0x43b6…6bac</code></a></td></tr>
-    <tr><td>17:53 后</td><td><a href="#run-1">1</a></td><td>root</td><td><code>MockUSD.mint</code></td><td class="y">+100</td><td><a href="https://sepolia.mantlescan.xyz/tx/0x5631ff3ce254b7ca77d48afcac30eee191ebd55102730f308482210cf8361265"><code>0x5631…1265</code></a></td></tr>
-    <tr><td>18:02</td><td><a href="#run-3">3</a></td><td>session</td><td><code>createToken</code> ZORK + <code>approve</code> + <code>buy</code></td><td class="n">−5</td><td><a href="https://sepolia.mantlescan.xyz/tx/0x511690c51673cadebca016a060ec5dec911613bd8b4e28be930dc8db05d63284"><code>0x5116…3284</code></a></td></tr>
-    <tr><td>18:09</td><td><a href="#run-5">5</a></td><td>session · daemon</td><td><code>buy</code> PEPE6222</td><td class="n">−3</td><td><a href="https://sepolia.mantlescan.xyz/tx/0x6322c8e4ba3211a9e9fdb17317d498fbd5e38e27329b74e144e7cbb9c4fb39d5"><code>0x6322…39d5</code></a></td></tr>
-    <tr><td>18:10</td><td><a href="#run-5">5</a></td><td>session · daemon</td><td><code>buy</code> WOJA4022</td><td class="n">−3</td><td><a href="https://sepolia.mantlescan.xyz/tx/0xadff0ba37be2e1483c95ad251086ee538a7d018200a4ded61b158b44fc3c9022"><code>0xadff…9022</code></a></td></tr>
-    <tr class="m"><td>18:10</td><td><a href="#run-6">6</a></td><td>market-sim 钱包 2</td><td><code>buy</code> PEPE6222（拉盘，自付 gas）</td><td></td><td><a href="https://sepolia.mantlescan.xyz/tx/0x2581d96a96adebf3db7a1c2fae78e988b9fb837af9b009863891c59252e6dfd4"><code>0x2581…dfd4</code></a></td></tr>
-    <tr><td>18:11</td><td><a href="#run-6">6</a></td><td>session · daemon</td><td><code>sell</code> PEPE6222 的 50%（止盈）</td><td class="y">+2.952955</td><td><a href="https://sepolia.mantlescan.xyz/tx/0xcdd2a210681d487d0081ee0c50c59d4d4ff041f64bddc6d8b121412339868192"><code>0xcdd2…8192</code></a></td></tr>
-    <tr><td>18:11</td><td><a href="#run-5">5</a></td><td>session · daemon</td><td><code>buy</code> TURB6927</td><td class="n">−3</td><td><a href="https://sepolia.mantlescan.xyz/tx/0xeeeb21cbbdd598f71e22a2e73dcfc9dd5a09618156acd491061b3a84b56f7d1f"><code>0xeeeb…7d1f</code></a></td></tr>
-    <tr><td>18:13</td><td><a href="#run-6">6</a></td><td>session · daemon</td><td><code>buy</code> DOGE394（stop 前最后一笔）</td><td class="n">−3</td><td><a href="https://sepolia.mantlescan.xyz/tx/0x1271adb145a5cba8a1ef26dce283f96efaface2b0ac1bb696352b8d7d0e955fb"><code>0x1271…55fb</code></a></td></tr>
-    <tr><td>18:14</td><td><a href="#run-7">7</a></td><td>session</td><td><code>claimCreatorFees</code> ZORK</td><td class="y">+0.025</td><td><a href="https://sepolia.mantlescan.xyz/tx/0x226aaf3b7cb4049775f553dac7917835d6a809cb7365874fc8a23cd2c2b6f384"><code>0x226a…f384</code></a></td></tr>
-    <tr><td>18:18</td><td><a href="#run-9">9</a></td><td>root</td><td>撤销 <code>trader</code> + 授权清零</td><td></td><td><a href="https://sepolia.mantlescan.xyz/tx/0xefa7c2603e9b8ee91aa3e46f22bd4c53d0218ac19e0289823d5dd368eec0c6c3"><code>0xefa7…c6c3</code></a></td></tr>
+    <tr><td>17:53</td><td><a href="#run-1">1</a></td><td>root</td><td>7702 升级 + 授予 <code>trader</code>（type-4）</td><td></td><td>0.044854</td><td><a href="https://sepolia.mantlescan.xyz/tx/0x43b68db44b607952acdd1c7ef759018b0cc994516336520be719d738c76d6bac"><code>0x43b6…6bac</code></a></td></tr>
+    <tr><td>17:53 后</td><td><a href="#run-1">1</a></td><td>root</td><td><code>MockUSD.mint</code></td><td class="y">+100</td><td>0.004775</td><td><a href="https://sepolia.mantlescan.xyz/tx/0x5631ff3ce254b7ca77d48afcac30eee191ebd55102730f308482210cf8361265"><code>0x5631…1265</code></a></td></tr>
+    <tr><td>18:02</td><td><a href="#run-3">3</a></td><td>session</td><td><code>createToken</code> ZORK + <code>approve</code> + <code>buy</code></td><td class="n">−5</td><td>0.061900</td><td><a href="https://sepolia.mantlescan.xyz/tx/0x511690c51673cadebca016a060ec5dec911613bd8b4e28be930dc8db05d63284"><code>0x5116…3284</code></a></td></tr>
+    <tr><td>18:09</td><td><a href="#run-5">5</a></td><td>session · daemon</td><td><code>buy</code> PEPE6222</td><td class="n">−3</td><td>0.018463</td><td><a href="https://sepolia.mantlescan.xyz/tx/0x6322c8e4ba3211a9e9fdb17317d498fbd5e38e27329b74e144e7cbb9c4fb39d5"><code>0x6322…39d5</code></a></td></tr>
+    <tr><td>18:10</td><td><a href="#run-5">5</a></td><td>session · daemon</td><td><code>buy</code> WOJA4022</td><td class="n">−3</td><td>0.018464</td><td><a href="https://sepolia.mantlescan.xyz/tx/0xadff0ba37be2e1483c95ad251086ee538a7d018200a4ded61b158b44fc3c9022"><code>0xadff…9022</code></a></td></tr>
+    <tr class="m"><td>18:10</td><td><a href="#run-6">6</a></td><td>market-sim 钱包 2</td><td><code>buy</code> PEPE6222（拉盘，自付 gas）</td><td></td><td class="m">0.006168（自付）</td><td><a href="https://sepolia.mantlescan.xyz/tx/0x2581d96a96adebf3db7a1c2fae78e988b9fb837af9b009863891c59252e6dfd4"><code>0x2581…dfd4</code></a></td></tr>
+    <tr><td>18:11</td><td><a href="#run-6">6</a></td><td>session · daemon</td><td><code>sell</code> PEPE6222 的 50%（止盈）</td><td class="y">+2.952955</td><td>0.011278</td><td><a href="https://sepolia.mantlescan.xyz/tx/0xcdd2a210681d487d0081ee0c50c59d4d4ff041f64bddc6d8b121412339868192"><code>0xcdd2…8192</code></a></td></tr>
+    <tr><td>18:11</td><td><a href="#run-5">5</a></td><td>session · daemon</td><td><code>buy</code> TURB6927</td><td class="n">−3</td><td>0.018463</td><td><a href="https://sepolia.mantlescan.xyz/tx/0xeeeb21cbbdd598f71e22a2e73dcfc9dd5a09618156acd491061b3a84b56f7d1f"><code>0xeeeb…7d1f</code></a></td></tr>
+    <tr><td>18:13</td><td><a href="#run-6">6</a></td><td>session · daemon</td><td><code>buy</code> DOGE394（stop 前最后一笔）</td><td class="n">−3</td><td>0.018464</td><td><a href="https://sepolia.mantlescan.xyz/tx/0x1271adb145a5cba8a1ef26dce283f96efaface2b0ac1bb696352b8d7d0e955fb"><code>0x1271…55fb</code></a></td></tr>
+    <tr><td>18:14</td><td><a href="#run-7">7</a></td><td>session</td><td><code>claimCreatorFees</code> ZORK</td><td class="y">+0.025</td><td>0.008091</td><td><a href="https://sepolia.mantlescan.xyz/tx/0x226aaf3b7cb4049775f553dac7917835d6a809cb7365874fc8a23cd2c2b6f384"><code>0x226a…f384</code></a></td></tr>
+    <tr><td>18:18</td><td><a href="#run-9">9</a></td><td>root</td><td>撤销 <code>trader</code> + 授权清零</td><td></td><td>0.006218</td><td><a href="https://sepolia.mantlescan.xyz/tx/0xefa7c2603e9b8ee91aa3e46f22bd4c53d0218ac19e0289823d5dd368eec0c6c3"><code>0xefa7…c6c3</code></a></td></tr>
   </tbody>
 </table>
 </div>
