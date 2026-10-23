@@ -6,7 +6,7 @@
 name: mantle-meme-openclaw
 services:
   openclaw:
-    image: mantle-meme-openclaw:2026.10.5
+    image: mantle-meme-openclaw:2026.10.6
     build:
       context: ../..
       dockerfile: docker/openclaw/Dockerfile

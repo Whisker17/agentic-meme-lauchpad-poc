@@ -1,6 +1,6 @@
 # OpenClaw with this repository's `mantle-meme` CLI built in. Build context: the repository root.
 #   docker build -f docker/openclaw/Dockerfile -t mantle-meme-openclaw .
-FROM ghcr.io/openclaw/openclaw:2026.10.5@sha256:f40d1e66fd14d8c5b49c832f4100f83b53fdc01f5108f7db11de38fd0ee6dbe5
+FROM ghcr.io/openclaw/openclaw:2026.10.6@sha256:7dbff0fe5f5359b1badefe90a23efa9f203cd0d3c36bee095f4896c7a1d3864b
 
 # The base image's corepack home is root-owned; the image runs as `node`.
 ENV COREPACK_HOME=/home/node/.cache/corepack

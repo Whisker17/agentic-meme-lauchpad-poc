@@ -122,12 +122,12 @@ pnpm check
 
 ## 3. OpenClaw：镜像和模型登录
 
-**大约 10 分钟。结束时：** 镜像 `mantle-meme-openclaw:2026.10.5` 已构建；状态目录
+**大约 10 分钟。结束时：** 镜像 `mantle-meme-openclaw:2026.10.6` 已构建；状态目录
 `~/.mantle-meme-openclaw` 里有你的模型配置和 key。
 
 ### 3.1 构建镜像
 
-镜像以 OpenClaw 2026.10.5 为底，把这份仓库的 `mantle-meme` CLI 装进去。
+镜像以 OpenClaw 2026.10.6 为底，把这份仓库的 `mantle-meme` CLI 装进去。
 
 ```bash
 docker compose -f docker/openclaw/compose.yaml build
@@ -136,7 +136,7 @@ docker compose -f docker/openclaw/compose.yaml build
 看到这个就对了（第一次要几分钟，之后有缓存，几十秒）：
 
 ```text
- Image mantle-meme-openclaw:2026.10.5 Built
+ Image mantle-meme-openclaw:2026.10.6 Built
 ```
 
 不对？先查这个：拉不到 `ghcr.io/openclaw/openclaw` 一般是网络问题；如果你的网络要走代理，确认
@@ -159,7 +159,7 @@ Docker 也配了代理。
 ```bash
 mkdir -p ~/.mantle-meme-openclaw
 oc() { docker run --rm -it --entrypoint node -v ~/.mantle-meme-openclaw:/home/node/.openclaw \
-  mantle-meme-openclaw:2026.10.5 openclaw.mjs "$@"; }
+  mantle-meme-openclaw:2026.10.6 openclaw.mjs "$@"; }
 oc config set skills.load.extraDirs '["/skills"]' --strict-json
 ```
 
@@ -1101,7 +1101,7 @@ scripts/demo-up.sh
 rm -rf ~/.mantle-meme-rehearsal-root ~/.mantle-meme-rehearsal-agent
 rm -rf ~/.mantle-meme-agent
 rm -rf ~/.mantle-meme-demo
-docker image rm mantle-meme-openclaw:2026.10.5
+docker image rm mantle-meme-openclaw:2026.10.6
 ```
 
 `~/.mantle-meme-root` 里是 root key，它控制着账户；`~/.mantle-meme-openclaw` 里是你的模型 key；

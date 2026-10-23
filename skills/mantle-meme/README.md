@@ -6,10 +6,12 @@ command, checked on chain by the session's policy.
 
 ## Tested version
 
-OpenClaw **2026.10.5** (`1b58cb9`), image
-`ghcr.io/openclaw/openclaw:2026.10.5@sha256:f40d1e66fd14d8c5b49c832f4100f83b53fdc01f5108f7db11de38fd0ee6dbe5`,
-in Docker. The dry run below passes §9.2 steps 2–8 with a real model, the autopilot daemon still
-running after every turn that follows its start (see "Why the container has a launcher").
+OpenClaw **2026.10.6** (`fe06181`), image
+`ghcr.io/openclaw/openclaw:2026.10.6@sha256:7dbff0fe5f5359b1badefe90a23efa9f203cd0d3c36bee095f4896c7a1d3864b`,
+in Docker. On 2026.10.5, the dry run below passed §9.2 steps 2–8 with a real model, the autopilot
+daemon still running after every turn that follows its start (see "Why the container has a launcher").
+2026.10.6 was re-checked with the fork rehearsal of [docs/runbook.md](../../docs/runbook.md) §6 at
+command level, with a scripted model in place of a real one.
 
 ## Install (Docker)
 
@@ -37,7 +39,7 @@ off (the container is the boundary). Run from the repository root:
    ```bash
    mkdir -p ~/.mantle-meme-openclaw
    oc() { docker run --rm -it --entrypoint node -v ~/.mantle-meme-openclaw:/home/node/.openclaw \
-     mantle-meme-openclaw:2026.10.5 openclaw.mjs "$@"; }
+     mantle-meme-openclaw:2026.10.6 openclaw.mjs "$@"; }
    oc config set skills.load.extraDirs '["/skills"]' --strict-json
    ```
 
@@ -118,7 +120,7 @@ holds the agent password (visible to `docker inspect`): testnet only.
 
 ### Why the container has a launcher
 
-OpenClaw 2026.10.5 owns every process its `exec` tool starts on Linux (a child subreaper, with no
+OpenClaw 2026.10.6 owns every process its `exec` tool starts on Linux (a child subreaper, with no
 switch to turn it off): anything a command leaves behind is killed when the command returns, and
 what is still running is stopped when an `agent --local` turn ends. The daemon `autopilot start`
 spawns is such a process, so started straight from the agent it would stop within milliseconds.
