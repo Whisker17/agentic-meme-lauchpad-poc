@@ -9,7 +9,7 @@ Install and use: [docs/usage.md](docs/usage.md). The Telegram demo: [docs/demo.m
 
 ## 文档
 
-- [系统讲解](docs/onboarding/index.html)：7702 SDK、meme launchpad 和 OpenClaw 怎么配合。这是单个 HTML 文件，GitHub 只显示源码：clone 或下载仓库后，用浏览器打开 `docs/onboarding/index.html`。
+- [系统讲解](docs/onboarding/index.html)：7702 SDK、meme launchpad 和 OpenClaw 怎么配合，外加一次真实运行的逐步拆解。这是一个离线 HTML 页面，GitHub 只显示源码：clone 或下载仓库后，用浏览器打开 `docs/onboarding/index.html`。
 - [复现手册](docs/runbook.md)：要自己跑一遍，照着它做，从 clone 到跑完整个演示。
 - [演示实录](docs/example.md)：演示记录模板，跑完后填写结果、补上截图。
 - [Telegram 演示](docs/demo.md)：演示脚本，逐条照做。
